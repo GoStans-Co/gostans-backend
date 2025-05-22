@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-from decouple import config
+from decouple import config,Csv
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -30,7 +30,8 @@ SECRET_KEY = config('SECRET_KEY', default='fallback-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+#ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
 
 # Application definition
