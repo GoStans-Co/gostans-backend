@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+*.pyo
+
+# Django stuff
+*.log
+*.pot
+*.pyc
+*.sqlite3
+*.db
+*.bak
+*.swp
+*.tmp
+
+# Environment variables
+.env
+.env.*
+
+# Secrets
+secrets.json
+
+# Static files
+staticfiles/
+static/
+media/
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Virtualenv
+venv/
+ENV/
+env/
+
+# Migrations (optional to ignore unless collaborating)
+*/migrations/__pycache__/
+*.pyc
+*/migrations/*.pyc
