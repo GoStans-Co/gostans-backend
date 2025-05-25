@@ -66,7 +66,7 @@ class TourAdmin(admin.ModelAdmin):
         return "(No image)"
 
     main_image_preview.short_description = 'Main Image Preview'
-    
+
     def display_tags(self, obj):
         return ", ".join(tag.name for tag in obj.tags.all())
     display_tags.short_description = "Tags"
@@ -132,7 +132,7 @@ class TourAdmin(admin.ModelAdmin):
 @admin.register(TourTag)
 class TourTagAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug')
-    filter_horizontal = ('tours',)
+    #filter_horizontal = ('tours',)
     search_fields = ('name', 'slug')
 
 @admin.register(TourType)
