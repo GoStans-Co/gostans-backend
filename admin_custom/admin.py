@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import User, Group
-from django.contrib.auth.admin import UserAdmin, GroupAdmin
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from django.contrib.auth.admin import GroupAdmin
+from partners.admin import UserAdmin 
 
 admin.site.site_header = "Gostance Admin Panel"
 admin.site.site_title = "Gostance Dashboard"
@@ -11,18 +11,12 @@ admin.site.index_title = "Welcome to Gostance CMS"
 admin.site.unregister(User)
 admin.site.unregister(Group)
 
-if OutstandingToken in admin.site._registry:
-    admin.site.unregister(OutstandingToken)
-
-if BlacklistedToken in admin.site._registry:
-    admin.site.unregister(BlacklistedToken) 
-
 # Customize display names
-User._meta.verbose_name = 'Package Provider'
-User._meta.verbose_name_plural = 'Package Providers'
+User._meta.verbose_name = 'Partner'
+User._meta.verbose_name_plural = 'Add Partner'
 
-Group._meta.verbose_name = 'Package Group'
-Group._meta.verbose_name_plural = 'Package Groups'
+Group._meta.verbose_name = 'Group'
+Group._meta.verbose_name_plural = 'Add Group'
 
 
 # Re-register with custom labels

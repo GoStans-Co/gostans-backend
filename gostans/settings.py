@@ -30,8 +30,8 @@ SECRET_KEY = config('SECRET_KEY', default='fallback-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-#ALLOWED_HOSTS = []
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+ALLOWED_HOSTS = []
+#ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
 
 # Application definition
@@ -48,11 +48,17 @@ INSTALLED_APPS = [
     'admin_custom',
     'customer_auth',
     'rest_framework',
-    'rest_framework.authtoken',
+    #'rest_framework.authtoken',
     'modeltranslation',
+    'location',
+    'partners',
+    'tours',
+    'smart_selects',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
@@ -62,6 +68,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://xplore-asia.web.app",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173"
+
 ]
 
 REST_FRAMEWORK = {
@@ -100,7 +115,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'gostans.wsgi.application'
-
+ #CORS_ALLOW_ALL_ORIGINS = True
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
@@ -162,7 +177,8 @@ LOCALE_PATHS = [
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
