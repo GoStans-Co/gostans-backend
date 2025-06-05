@@ -13,6 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from customer_auth.authentication import CustomerUserJWTAuthentication
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
+from rest_framework.views import APIView
+
 
 
 
@@ -127,13 +129,13 @@ class TourDetailAPIView(RetrieveAPIView):
         )
 
 
-class WishlistAddAPIView(generics.CreateAPIView):
+class WishlistAddAPIView(APIView):
 
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
     lookup_field = 'uuid'
     lookup_url_kwarg = 'tour_uuid'
-    
+
     def post(self, request, tour_uuid):
         customer = request.user  # Assumes user is authenticated
         tour = get_object_or_404(Tour, uuid=tour_uuid)
