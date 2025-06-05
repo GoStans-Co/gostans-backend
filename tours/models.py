@@ -1,8 +1,13 @@
+import uuid
+import requests
+from django.conf import settings
 from django.db import models
 from location.models import Country, City  # Replace with actual location models
 from django.contrib.auth.models import User
 from multiselectfield import MultiSelectField
 from smart_selects.db_fields import ChainedForeignKey
+from common.utils import get_coordinates
+
 
 class TourType(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -18,8 +23,36 @@ class TourTag(models.Model):
     def __str__(self):
         return self.name
 
+class TourPricing(models.Model):
+    AGE_CATEGORY_CHOICES = [
+        ('adult', 'Adult'),
+        ('child', 'Child'),
+        ('infant', 'Infant'),
+    ]
+
+    tour = models.ForeignKey(
+        'Tour',
+        on_delete=models.CASCADE,
+        related_name='age_pricing'
+    )
+    age_category = models.CharField(max_length=10, choices=AGE_CATEGORY_CHOICES)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        unique_together = ('tour', 'age_category')
+
+    def __str__(self):
+        return f"{self.tour.title} - {self.age_category}: {self.price}"
+
 
 class Tour(models.Model):
+    id = models.AutoField(primary_key=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    use_detailed_pricing = models.BooleanField(
+        default=False,
+        help_text="Enable age-specific pricing (e.g., adult, child)"
+    )
+
     LANGUAGE_CHOICES = [
         ('en', 'English'),
         ('ru', 'Russian'),
@@ -28,13 +61,11 @@ class Tour(models.Model):
     ]
 
     DURATION_CHOICES = [(f'{i} day', f'{i} Day{"s" if i > 1 else ""}') for i in range(1, 8)]
-
     title = models.CharField(max_length=255)
     short_description = models.TextField(max_length=300)
     tour_type = models.ForeignKey(TourType, on_delete=models.SET_NULL, null=True)
     duration = models.CharField(max_length=10, choices=DURATION_CHOICES)
     about = models.TextField()
-
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(
         max_length=10,
@@ -64,6 +95,13 @@ class Tour(models.Model):
     tags = models.ManyToManyField('TourTag', related_name='tours', blank=True)
     main_image = models.ImageField(upload_to='tours/main_images/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def get_price(self, age_category='adult'):
+        if self.use_detailed_pricing:
+            pricing = self.age_pricing.filter(age_category=age_category).first()
+            return pricing.price if pricing else None
+        return self.price
+
 
     def __str__(self):
         return self.title
@@ -95,6 +133,7 @@ class ExcludedItem(models.Model):
     def __str__(self):
         return f"Excluded: {self.text}"
 
+
 class Itinerary(models.Model):
     tour = models.ForeignKey(Tour, related_name='itineraries', on_delete=models.CASCADE)
     day_number = models.PositiveIntegerField()
@@ -102,6 +141,10 @@ class Itinerary(models.Model):
     description = models.TextField()
     accommodation = models.CharField(max_length=255, blank=True)
     included_meals = models.CharField(max_length=255, blank=True)
+    location_name = models.CharField(max_length=255,blank=True, null=True) 
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
 
     class Meta:
         unique_together = ('tour', 'day_number')
@@ -109,3 +152,26 @@ class Itinerary(models.Model):
 
     def __str__(self):
         return f"Day {self.day_number} - {self.day_title or 'Itinerary'}"
+
+    def save(self, *args, **kwargs):
+        if self.location_name and (not self.latitude or not self.longitude):
+            lat, lng = get_coordinates(self.location_name)
+            if lat and lng:
+                self.latitude = lat
+                self.longitude = lng
+        super().save(*args, **kwargs)
+
+
+class Wishlist(models.Model):
+    customer = models.ForeignKey('customer_auth.CustomerUser', on_delete=models.CASCADE, related_name='wishlists')
+    tour = models.ForeignKey('tours.Tour', on_delete=models.CASCADE, related_name='wishlisted_by')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('customer', 'tour')
+
+    def __str__(self):
+        return f"{self.customer.email} - {self.tour.title}"
+
+
+

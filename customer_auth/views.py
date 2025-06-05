@@ -14,6 +14,7 @@ from google.auth.transport import requests
 import random
 import string
 from django.utils.crypto import get_random_string
+from common.utils import custom_response
 
 User = CustomerUser  # Use this instead of get_user_model()
 
@@ -135,7 +136,6 @@ class GoogleSignupAPIView(APIView):
         try:
             # Verify token
             idinfo = id_token.verify_oauth2_token(id_token_str, requests.Request())
-            print("Token verified, idinfo:", idinfo)
             # Extract user info
             email = idinfo.get('email')
             first_name = idinfo.get('given_name', '')

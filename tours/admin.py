@@ -1,7 +1,7 @@
 from django.contrib import admin
 from multiselectfield import MultiSelectField 
 from django.utils.html import format_html
-from .models import Tour, TourType, TourImage, IncludedItem, ExcludedItem, Itinerary ,TourTag
+from .models import Tour, TourType, TourImage, IncludedItem, ExcludedItem, Itinerary ,TourTag,TourPricing
 from django import forms
 from partners.models import PartnerProfile
 from django.core.exceptions import ValidationError
@@ -35,8 +35,14 @@ class ExcludedItemInline(admin.TabularInline):
 class ItineraryInline(admin.StackedInline):
     model = Itinerary
     extra = 1
-    fields = ('day_number', 'day_title', 'description', 'accommodation', 'included_meals')
+    fields = ('day_number', 'day_title', 'description', 'accommodation', 'included_meals','location_name')
+    readonly_fields = ('latitude', 'longitude') 
     show_change_link = True  # optional
+
+class TourPricingInline(admin.TabularInline):
+    model = TourPricing
+    extra = 1
+
 
 @admin.register(Tour)
 class TourAdmin(admin.ModelAdmin):
@@ -45,6 +51,7 @@ class TourAdmin(admin.ModelAdmin):
     }
     list_display = ('title', 'tour_type', 'duration', 'price', 'city', 'country', 'group_size', 'display_languages','author_name','display_tags')
     inlines = [
+        TourPricingInline,
         TourImageInline,
         IncludedItemInline,
         ExcludedItemInline,
@@ -138,3 +145,4 @@ class TourTagAdmin(admin.ModelAdmin):
 @admin.register(TourType)
 class TourTypeAdmin(admin.ModelAdmin):
     list_display = ('name',)
+

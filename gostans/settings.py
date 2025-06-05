@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECRET_KEY = 'django-insecure-$$e=0t3d*6j43yv6mc5s2#dbad0dciw1g*z^onc7p(s680*ks_'
 #SECRET_KEY = config('SECRET_KEY')
 SECRET_KEY = config('SECRET_KEY', default='fallback-key')
-
+#GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -54,7 +54,10 @@ INSTALLED_APPS = [
     'partners',
     'tours',
     'smart_selects',
-    'corsheaders'
+    'corsheaders',
+    'django_filters',
+    'drf_yasg',
+    'order'
 ]
 
 MIDDLEWARE = [
@@ -82,7 +85,9 @@ CORS_ALLOWED_ORIGINS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        
     ],
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
 }
 
 SIMPLE_JWT = {
