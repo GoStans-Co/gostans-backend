@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECRET_KEY = 'django-insecure-$$e=0t3d*6j43yv6mc5s2#dbad0dciw1g*z^onc7p(s680*ks_'
 #SECRET_KEY = config('SECRET_KEY')
 SECRET_KEY = config('SECRET_KEY', default='fallback-key')
-#GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY")
+GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
