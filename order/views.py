@@ -66,8 +66,9 @@ class RemoveFromCartAPIView(generics.DestroyAPIView):
 class CartListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
+    serializer_class = CartItemSerializer  
 
-    def get(self, request):
+    def list(self, request, *args, **kwargs):  
         customer = request.user
         cart_items = Cart.objects.filter(customer=customer).select_related('tour')
 
@@ -78,10 +79,9 @@ class CartListAPIView(generics.ListAPIView):
                 data=[]
             )
 
-        serialized = CartItemSerializer(cart_items, many=True)
-
+        serializer = self.get_serializer(cart_items, many=True)
         return custom_response(
             status_code=status.HTTP_200_OK,
             message="Cart items retrieved successfully",
-            data=serialized.data
+            data=serializer.data
         )
