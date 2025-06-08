@@ -49,8 +49,9 @@ class TourListAPIView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        total_count = queryset.count()
 
-        if not queryset.exists():
+        if total_count == 0:
             return custom_response(
                 status_code=status.HTTP_200_OK,
                 message="No tours available.",
@@ -68,7 +69,10 @@ class TourListAPIView(generics.ListAPIView):
             return custom_response(
                 status_code=status.HTTP_200_OK,
                 message="All tours retrieved successfully (no pagination)",
-                data={"results": serializer.data}
+                data={
+                    "count": total_count,
+                    "results": serializer.data
+                }
             )
 
         # Handle pagination
@@ -84,6 +88,8 @@ class TourListAPIView(generics.ListAPIView):
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_data = self.get_paginated_response(serializer.data).data
+            # Inject `count` manually into paginated response
+            paginated_data['count'] = total_count
             return custom_response(
                 status_code=status.HTTP_200_OK,
                 message="Paginated tours retrieved successfully",
@@ -95,7 +101,10 @@ class TourListAPIView(generics.ListAPIView):
         return custom_response(
             status_code=status.HTTP_200_OK,
             message="Tour list retrieved successfully",
-            data={"results": serializer.data}
+            data={
+                "count": total_count,
+                "results": serializer.data
+            }
         )
 
 
