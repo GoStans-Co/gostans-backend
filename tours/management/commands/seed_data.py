@@ -1,6 +1,8 @@
 #management/commands/seed_data.py
 from django.core.management.base import BaseCommand
 from random import randint
+from django.contrib.auth.models import User
+
 
 from tours.factories import (
     TourFactory, IncludedItemFactory, ExcludedItemFactory, ItineraryFactory,
@@ -29,7 +31,7 @@ class Command(BaseCommand):
             ExcludedItem.objects.all().delete()
             Itinerary.objects.all().delete()
             Tour.objects.all().delete()
-
+            User.objects.filter(username__startswith="user_").delete()
 
             # deleting base table
             TourTag.objects.all().delete()
