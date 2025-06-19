@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import CustomerUserSignupView,CustomerUserUpdateView,CustomerUserProfileView,CustomerLoginView,CustomerUserImageUpdateView,CustomTokenRefreshView,GoogleSignupAPIView
+from .views import CustomerUserSignupView,CustomerUserUpdateView,CustomerUserProfileView,CustomerLoginView,CustomerUserImageUpdateView,CustomTokenRefreshView,GoogleSignupAPIView,SendOTPView,VerifyOTPView
 from rest_framework.authtoken.views import obtain_auth_token
 
 
@@ -11,5 +11,8 @@ urlpatterns = [
     path('updateimage/', CustomerUserImageUpdateView.as_view(), name='customer-image-update'),
     path('refresh-token/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('google/', GoogleSignupAPIView.as_view(), name='google-signup'),
+    path('send-otp/', SendOTPView.as_view(), name='send-otp'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
+
 
 ]

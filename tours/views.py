@@ -16,9 +16,6 @@ from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 
 
-
-
-
 class WishlistPagination(PageNumberPagination):
     page_size = 5  # Default 5 items
     page_size_query_param = 'page_size'  # Optional: allow clients to override
@@ -31,6 +28,7 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 
 class TourListAPIView(generics.ListAPIView):
+    authentication_classes = [CustomerUserJWTAuthentication]
     queryset = Tour.objects.all().prefetch_related('tags').select_related('country', 'city', 'tour_type')
     serializer_class = TourListSerializer
     pagination_class = StandardResultsSetPagination

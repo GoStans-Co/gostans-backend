@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+import phonenumbers
 
 
 class CustomerLoginSerializer(serializers.Serializer):
@@ -90,7 +91,6 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             raise serializers.ValidationError({'refresh': 'Token is invalid or expired'})
 
 
-
 class GoogleSerializer(serializers.Serializer):
     id_token = serializers.CharField()
 
@@ -98,3 +98,20 @@ class CustomerSocialSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerUser
         fields = ['id', 'email', 'name', 'phone']
+
+
+class SendOTPSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=20)
+
+    def validate_phone(self, value):
+        try:
+            parsed = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(parsed):
+                raise serializers.ValidationError("Invalid phone number.")
+        except Exception:
+            raise serializers.ValidationError("Invalid phone number format.")
+        return value
+    
+class VerifyOTPSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=15)
+    otp = serializers.CharField(max_length=4)

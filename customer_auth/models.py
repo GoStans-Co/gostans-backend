@@ -3,7 +3,9 @@ from django.core.exceptions import ValidationError
 import re
 import uuid
 from uuid25 import Uuid25
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
 
 def user_directory_path(instance, filename):
     # uploaded files will be stored in MEDIA_ROOT/customer_<id>/<filename>
@@ -34,3 +36,20 @@ class CustomerUser(models.Model):
     def is_authenticated(self):
         """Required by DRF permission classes"""
         return True 
+
+
+
+class CustomerOTP(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    phone = models.CharField(max_length=15, db_index=True)
+    otp = models.CharField(max_length=4)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    
+    def is_expired(self):
+        # OTP expires in 5 minutes
+        return timezone.now() > self.created_at + timezone.timedelta(minutes=5)
+
+    def __str__(self):
+        return f"OTP for {self.phone} - Verified: {self.is_verified}"

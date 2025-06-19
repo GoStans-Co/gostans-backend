@@ -1,8 +1,8 @@
 from rest_framework import status,generics,permissions,parsers
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import CustomerUser
-from .serializers import CustomerUserSerializer,CustomerUserProfileSerializer,CustomerLoginSerializer,CustomTokenRefreshSerializer,GoogleSerializer,CustomerSocialSerializer
+from .models import CustomerUser,CustomerOTP
+from .serializers import CustomerUserSerializer,CustomerUserProfileSerializer,CustomerLoginSerializer,CustomTokenRefreshSerializer,GoogleSerializer,CustomerSocialSerializer,SendOTPSerializer,VerifyOTPSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from customer_auth.authentication import CustomerUserJWTAuthentication
@@ -14,7 +14,10 @@ from google.auth.transport import requests
 import random
 import string
 from django.utils.crypto import get_random_string
-from common.utils import custom_response
+from common.utils import custom_response,generate_otp
+from datetime import timedelta
+from django.utils import timezone
+
 
 User = CustomerUser  # Use this instead of get_user_model()
 
@@ -131,7 +134,7 @@ class GoogleSignupAPIView(APIView):
         serializer = GoogleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         id_token_str = serializer.validated_data['id_token']
-        print("Received id_token:", id_token_str)  # print received token
+        #print("Received id_token:", id_token_str)  # print received token
 
         try:
             # Verify token
@@ -182,3 +185,67 @@ class GoogleSignupAPIView(APIView):
                 "data": {},
                 "statusCode": 400
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+
+class SendOTPView(APIView):
+    def post(self, request):
+        serializer = SendOTPSerializer(data=request.data)
+        if not serializer.is_valid():
+            # Use your custom response for validation errors
+            return custom_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Invalid phone number",
+                data=serializer.errors
+            )
+
+        phone = serializer.validated_data['phone']
+        otp_code = generate_otp()
+        expires_at = timezone.now() + timedelta(minutes=5)
+
+        # Save or update OTP
+        CustomerOTP.objects.update_or_create(
+            phone=phone,
+            defaults={
+                'otp': otp_code,
+                'expires_at': expires_at
+            }
+        )
+
+        # Here, just print OTP for demo
+        print(f"Sending OTP {otp_code} to {phone}")
+
+        return custom_response(
+            status_code=status.HTTP_200_OK,
+            data={"otp": otp_code},
+            message="OTP sent successfully"
+        )
+    
+
+class VerifyOTPView(APIView):
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        if not serializer.is_valid():
+            return custom_response(status_code=400, message="Invalid data", data=serializer.errors)
+
+        phone = serializer.validated_data['phone']
+        otp_input = serializer.validated_data['otp']
+
+        # Delete expired OTPs for this phone
+        CustomerOTP.objects.filter(phone=phone, expires_at__lt=timezone.now()).delete()
+
+        # Check if OTP exists and is valid
+        otp_obj = CustomerOTP.objects.filter(
+            phone=phone,
+            otp=otp_input,
+            expires_at__gte=timezone.now()
+        ).first()
+
+        if not otp_obj:
+            return custom_response(status_code=400, message="Invalid or expired OTP")
+
+        # OTP verified successfully, delete it (one-time use)
+        otp_obj.delete()
+
+        # TODO: Perform user login/signup or token generation here
+
+        return custom_response(status_code=200, message="OTP verified successfully")

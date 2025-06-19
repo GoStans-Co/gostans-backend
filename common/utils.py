@@ -1,6 +1,7 @@
 import requests
 from rest_framework.response import Response
 from django.conf import settings
+import random
 
 def custom_response(status_code=200, message="Success", data=None):
     return Response({
@@ -22,3 +23,8 @@ def get_coordinates(location_name):
             loc = results[0]['geometry']['location']
             return loc['lat'], loc['lng']
     return None, None
+
+
+
+def generate_otp(length=4):
+    return ''.join(str(random.randint(0, 9)) for _ in range(length))
