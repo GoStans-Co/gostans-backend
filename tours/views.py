@@ -108,8 +108,6 @@ class TourListAPIView(generics.ListAPIView):
         )
 
 
-
-
 class TourDetailAPIView(RetrieveAPIView):
     queryset = Tour.objects.all().prefetch_related(
         'tags', 'images', 'itineraries', 'age_pricing'

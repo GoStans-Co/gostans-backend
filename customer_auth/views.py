@@ -149,7 +149,7 @@ class GoogleSignupAPIView(APIView):
                 email=email,
                 defaults={
                     'name': name or email.split('@')[0],
-                    'phone': '',
+                    'phone': None,
                     'oauth_id': oauth_id,
                     'oauth_provider': 'GOOGLE',
                     'image': '',

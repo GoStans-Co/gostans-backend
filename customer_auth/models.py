@@ -17,7 +17,7 @@ class CustomerUser(models.Model):
     id = models.CharField(primary_key=True, default=generate_uuid25, editable=False, max_length=25)
     email = models.EmailField(unique=True,verbose_name=_("Email"))
     name = models.CharField(max_length=255,verbose_name=_("Name"))
-    phone = models.CharField(max_length=15, unique=True,verbose_name=_("Phone"))
+    phone = models.CharField(max_length=15, blank=True, null=True, unique=True, verbose_name=_("Phone"))
     password = models.CharField(max_length=255,verbose_name=_("Password"))  # Store as a hashed password
     is_active = models.BooleanField(default=True) 
     date_joined = models.DateTimeField(auto_now_add=True)
