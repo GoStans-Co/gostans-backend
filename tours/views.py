@@ -107,6 +107,8 @@ class TourListAPIView(generics.ListAPIView):
 
 
 class TourDetailAPIView(RetrieveAPIView):
+    authentication_classes = [CustomerUserJWTAuthentication]
+    
     queryset = Tour.objects.all().prefetch_related(
         'tags', 'images', 'itineraries', 'age_pricing'
     ).select_related('country', 'city', 'tour_type')
