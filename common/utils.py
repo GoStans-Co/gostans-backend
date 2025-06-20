@@ -28,3 +28,11 @@ def get_coordinates(location_name):
 
 def generate_otp(length=4):
     return ''.join(str(random.randint(0, 9)) for _ in range(length))
+
+
+def user_can_update_booking(user, booking):
+    if user.is_superuser:
+        return True
+    if hasattr(user, 'partner_profile'):
+        return booking.partner == user.partner_profile
+    return False

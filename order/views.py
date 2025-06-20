@@ -7,9 +7,13 @@ from django.shortcuts import get_object_or_404
 from customer_auth.authentication import CustomerUserJWTAuthentication
 from common.utils import custom_response
 from tours.models import Tour
-from .models import Cart
+from .models import Cart,TourBooking,BookingParticipant
 from tours.serializers import TourListSerializer  
 from .serializers import CartItemSerializer,AddToCartSerializer,RemovedCartItemSerializer
+from .paypal_client import paypalrestsdk
+from rest_framework.views import APIView
+from django.db import transaction
+
 
 class AddToCartAPIView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
@@ -85,3 +89,181 @@ class CartListAPIView(generics.ListAPIView):
             message="Cart items retrieved successfully",
             data=serializer.data
         )
+    
+
+
+
+class CreatePaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    def post(self, request):
+        amount = request.data.get("amount")
+        currency = request.data.get("currency", "USD")
+        customer = request.user
+        tour_uuid = request.data.get("tour_uuid")
+        participants = request.data.get("participants", [])
+
+        errors = {}
+        if amount is None:
+            errors["amount"] = "Amount is required."
+        else:
+            try:
+                amount_val = float(amount)
+                if amount_val <= 0:
+                    errors["amount"] = "Amount must be greater than zero."
+                if round(amount_val, 2) != amount_val:
+                    errors["amount"] = "Amount can have up to 2 decimal places."
+            except ValueError:
+                errors["amount"] = "Amount must be a valid number."
+
+        valid_currencies = {"USD", "EUR", "GBP", "INR", "JPY", "UZS","RUB"}
+        if currency and currency.upper() not in valid_currencies:
+            errors["currency"] = f"Currency '{currency}' is not supported."
+
+        try:
+            tour = Tour.objects.get(uuid=tour_uuid)
+        except (Tour.DoesNotExist, ValueError):
+            errors["tour_uuid"] = "Tour not found or invalid UUID."
+
+        if not participants:
+            errors["participants"] = "At least one participant is required."
+
+        if errors:
+            return custom_response(
+                status_code=400,
+                message="Validation failed",
+                data=errors
+            )
+
+        payment = paypalrestsdk.Payment({
+            "intent": "sale",
+            "payer": {"payment_method": "paypal"},
+            "redirect_urls": {
+                "return_url": "https://xplore-asia.web.app/payment-success",
+                "cancel_url": "https://xplore-asia.web.app/payment-cancel"
+            },
+            "transactions": [{
+                "amount": {"total": f"{amount}", "currency": currency},
+                "description": "Tour Booking Payment"
+            }]
+        })
+
+        if payment.create():
+            with transaction.atomic():
+                # Save booking in DB
+                booking = TourBooking.objects.create(
+                    customer=customer,
+                    partner=tour.partner,
+                    tour=tour,
+                    payment_id=payment.id,
+                    amount=amount,
+                    currency=currency,
+                    status="PENDING",
+                    trip_start_date=tour.trip_start_date,
+                    trip_end_date=tour.trip_end_date,
+                    country=tour.country,
+                    city=tour.city
+                )
+
+                for idx, p in enumerate(participants):
+                    print(f"Participant {idx+1} data: {p}")
+                    missing_fields = [k for k in ("first_name", "last_name", "id_type", "id_number", "date_of_birth") if not p.get(k)]
+                    if missing_fields:
+                        print(f"Participant {idx+1} missing fields: {missing_fields}")
+                        return custom_response(
+                            status_code=400,
+                            message=f"Participant {idx + 1} is missing fields: {', '.join(missing_fields)}",
+                            data=p
+                        )
+                    BookingParticipant.objects.create(
+                        booking=booking,
+                        first_name=p["first_name"],
+                        last_name=p["last_name"],
+                        id_type=p["id_type"],
+                        id_number=p["id_number"],
+                        date_of_birth=p["date_of_birth"]
+                    )
+                    print(f"Participant {idx+1} saved")
+
+            for link in payment['links']:
+                if link['rel'] == 'approval_url':
+                    return custom_response(
+                        status_code=200,
+                        message="Payment created successfully",
+                        data={
+                            "booking_id": booking.id,
+                            "approval_url": link['href'],
+                            "payment_id": payment.id
+                        }
+                    )
+        else:
+            return custom_response(
+                status_code=400,
+                message="Payment creation failed",
+                data=payment.error
+            )
+
+
+class ExecutePaymentView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    def post(self, request):
+        payment_id = request.data.get("paymentId")
+        payer_id = request.data.get("PayerID")
+
+        errors = {}
+        if not payment_id:
+            errors["paymentId"] = "This field is required."
+        if not payer_id:
+            errors["PayerID"] = "This field is required."
+
+        if errors:
+            return custom_response(
+                status_code=400,
+                message="Validation failed",
+                data=errors
+            )
+
+        payment = paypalrestsdk.Payment.find(payment_id)
+
+        if payment.execute({"payer_id": payer_id}):
+            # Find corresponding booking
+            try:
+                booking = TourBooking.objects.get(payment_id=payment_id)
+            except TourBooking.DoesNotExist:
+                return custom_response(404, "Booking not found", {})
+
+            # Update booking status
+            booking.status = "Booked"  # or "Complete", depending on your app's logic
+            booking.payer_id = payer_id
+
+            # Optionally save PayPal sale transaction id if available
+            try:
+                sale = payment.transactions[0].related_resources[0].sale
+                booking.paypal_txn_id = sale.id
+            except (IndexError, AttributeError):
+                pass
+
+            booking.save()
+
+            return custom_response(
+                status_code=200,
+                message="Payment completed successfully",
+                data=payment.to_dict()
+            )
+        else:
+            try:
+                booking = TourBooking.objects.get(payment_id=payment_id)
+                booking.status = "Cancelled"
+                booking.save()
+            except TourBooking.DoesNotExist:
+                pass
+
+            return custom_response(
+                status_code=400,
+                message="Payment execution failed",
+                data=payment.error
+            )

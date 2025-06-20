@@ -33,6 +33,10 @@ DEBUG = True
 ALLOWED_HOSTS = []
 #ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
+#paypal cred
+PAYPAL_MODE =config('PAYPAL_MODE',default='sandbox')
+PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID")
+PAYPAL_CLIENT_SECRET = config("PAYPAL_CLIENT_SECRET")
 
 # Application definition
 

@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Cart
 from tours.models import Tour
+from .models import TourBooking, BookingParticipant
+from tours.models import Tour
 
 class TourSummarySerializer(serializers.ModelSerializer):
     class Meta:
@@ -43,3 +45,42 @@ class AddToCartSerializer(serializers.ModelSerializer):
 class RemovedCartItemSerializer(serializers.Serializer):
     tour_uuid = serializers.UUIDField()
     message = serializers.CharField()
+
+
+class BookingParticipantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookingParticipant
+        fields = ['first_name', 'last_name', 'id_type', 'id_number', 'date_of_birth']
+
+
+class TourBookingCreateSerializer(serializers.ModelSerializer):
+    participants = BookingParticipantSerializer(many=True)
+
+    class Meta:
+        model = TourBooking
+        fields = [
+            'tour', 'payment_id', 'amount', 'currency', 'trip_start_date',
+            'trip_end_date', 'participants'
+        ]
+
+    def validate(self, data):
+        tour = data.get("tour")
+        if not tour:
+            raise serializers.ValidationError("Tour is required.")
+        return data
+
+    def create(self, validated_data):
+        participants_data = validated_data.pop('participants')
+        customer = self.context['request'].user
+        tour = validated_data['tour']
+
+        booking = TourBooking.objects.create(
+            customer=customer,
+            partner=tour.partner,
+            **validated_data
+        )
+
+        for participant in participants_data:
+            BookingParticipant.objects.create(booking=booking, **participant)
+
+        return booking

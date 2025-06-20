@@ -44,6 +44,12 @@ class TourListAPIView(generics.ListAPIView):
 
     # Search by title, short_description, or about fields (partial match)
     search_fields = ['title', 'short_description', 'about']
+    
+    def get_queryset(self):
+        return Tour.objects.all() \
+            .order_by('-created_at') \
+            .prefetch_related('tags') \
+            .select_related('country', 'city', 'tour_type')
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -108,7 +114,7 @@ class TourListAPIView(generics.ListAPIView):
 
 class TourDetailAPIView(RetrieveAPIView):
     authentication_classes = [CustomerUserJWTAuthentication]
-    
+
     queryset = Tour.objects.all().prefetch_related(
         'tags', 'images', 'itineraries', 'age_pricing'
     ).select_related('country', 'city', 'tour_type')
