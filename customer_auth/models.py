@@ -23,11 +23,12 @@ class CustomerUser(models.Model):
     password = models.CharField(max_length=255,verbose_name=_("Password"))  # Store as a hashed password
     is_active = models.BooleanField(default=True) 
     date_joined = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     image = models.ImageField(upload_to=user_directory_path, null=True, blank=True)  # add on field
 
     oauth_id = models.CharField(max_length=255, blank=True, null=True, verbose_name=_("OAuth ID"))
     oauth_provider = models.CharField(max_length=50, blank=True, null=True, verbose_name=_("OAuth Provider"))
-
+    
 
     def __str__(self):
         return self.email

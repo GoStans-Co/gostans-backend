@@ -44,11 +44,6 @@ class ExcludedItemSerializer(serializers.ModelSerializer):
         model = ExcludedItem
         fields = ['text']
 
-class ExcludedItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ExcludedItem
-        fields = ['text']
-
 class IncludedItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = IncludedItem
@@ -62,7 +57,7 @@ class TourDetailSerializer(serializers.ModelSerializer):
     age_pricing = TourPricingSerializer(many=True, read_only=True)
     tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='slug')
     excluded=ExcludedItemSerializer(source='excluded_items',many=True, read_only=True)
-    IncludedItem=ExcludedItemSerializer(source='excluded_items',many=True, read_only=True)
+    IncludedItem=IncludedItemSerializer(source='excluded_items',many=True, read_only=True)
     tour_type = serializers.StringRelatedField()
     country = serializers.StringRelatedField()
     city = serializers.StringRelatedField()

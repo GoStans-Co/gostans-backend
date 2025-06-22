@@ -73,10 +73,15 @@ class CustomerUserUpdateView(generics.UpdateAPIView):
 class CustomerUserProfileView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
+    
     def get(self, request):
         user = request.user
         serializer = CustomerUserProfileSerializer(user)
-        return Response(serializer.data)
+        return custom_response(
+            status_code=status.HTTP_200_OK,
+            data={"data": serializer.data},
+            message="Profile detail fetched sucessfully"
+        )
 
 #api for update image
 class CustomerUserImageUpdateView(APIView):

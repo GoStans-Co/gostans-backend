@@ -5,8 +5,10 @@ import re
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from tours.serializers import WishlistTourSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 import phonenumbers
+
 
 
 class CustomerLoginSerializer(serializers.Serializer):
@@ -69,13 +71,23 @@ class CustomerUserSerializer(serializers.ModelSerializer):
         return instance
 
 class CustomerUserProfileSerializer(serializers.ModelSerializer):
+    wishlists = serializers.SerializerMethodField()
+    is_verified = serializers.SerializerMethodField()
+    date_joined = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
+    updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
+    
     class Meta:
         model = CustomerUser
-        fields = ['id', 'email', 'name', 'phone','image']
+        fields = ['id', 'email', 'name', 'phone','image','date_joined', 'updated_at', 'is_verified', 'wishlists']
+
+    def get_is_verified(self, obj):
+        return obj.is_active
+
+    def get_wishlists(self, obj):
+        wishlist_qs = obj.wishlists.select_related('tour')
+        return WishlistTourSerializer(wishlist_qs, many=True).data
 
     def to_representation(self, instance):
-        print("Serializer - instance received:", instance)
-        print("Serializer - instance.id:", instance.id)
         return super().to_representation(instance)
 
 
