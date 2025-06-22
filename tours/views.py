@@ -213,7 +213,7 @@ class WishlistAddAPIView(APIView):
             )
         }
     )
-    
+
     def post(self, request, tour_uuid):
         customer = request.user  # Assumes user is authenticated
         tour = get_object_or_404(Tour, uuid=tour_uuid)
@@ -239,6 +239,61 @@ class WishlistListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
     pagination_class = WishlistPagination
+
+    @swagger_auto_schema(
+        operation_description="Retrieve the authenticated user's wishlist.",
+        manual_parameters=[
+            openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description="JWT token in format: Bearer <token>",
+                required=True
+            ),
+            openapi.Parameter(
+                name="page",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="Page number for paginated results"
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Wishlist retrieved or empty",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Wishlist retrieved successfully",
+                        "data": {
+                            "count": 1,
+                            "next": None,
+                            "previous": None,
+                            "results": [
+                                {
+                                    "uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
+                                    "tour": {
+                                        "title": "Jeju Island Adventure",
+                                        "price": 150.0,
+                                        "duration": "3 days"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Invalid page number",
+                examples={
+                    "application/json": {
+                        "status": 404,
+                        "message": "Invalid page number.",
+                        "data": {}
+                    }
+                }
+            )
+        }
+    )
 
     def get_queryset(self):
         return Wishlist.objects.filter(customer=self.request.user).select_related('tour')

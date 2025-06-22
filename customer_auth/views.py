@@ -229,7 +229,16 @@ class CustomerUserProfileView(APIView):
                             "date_joined": "2025-06-22 17:01",
                             "updated_at": "2025-06-22 17:01",
                             "is_verified": True,
-                            "wishlists": []
+                            "wishlists": [
+                                {
+                                    "uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
+                                    "tour": {
+                                        "title": "Jeju Island Adventure",
+                                        "price": 150.0,
+                                        "duration": "3 days"
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
