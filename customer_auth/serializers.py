@@ -49,11 +49,15 @@ class CustomerUserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'name', 'phone', 'password']
         extra_kwargs = {'password': {'write_only': True}}
 
-    def validate_phone(self, value):
-        """Validate that the phone number is exactly 10 digits."""
-        if not re.fullmatch(r"\d{10}", value):  
-            raise serializers.ValidationError("Phone number must be exactly 10 digits.")
-        return value
+        def validate_phone(self, value):
+
+            pattern = r'^\+\d{10,15}$'
+            if not re.fullmatch(pattern, value):
+                raise serializers.ValidationError(
+                    "Phone number must be in the format +[countrycode][number], "
+                    "with 10 to 15 digits, e.g. +8201072646105."
+                )
+            return value
 
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])  # Hash password
@@ -75,7 +79,7 @@ class CustomerUserProfileSerializer(serializers.ModelSerializer):
     is_verified = serializers.SerializerMethodField()
     date_joined = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
     updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
-    
+
     class Meta:
         model = CustomerUser
         fields = ['id', 'email', 'name', 'phone','image','date_joined', 'updated_at', 'is_verified', 'wishlists']

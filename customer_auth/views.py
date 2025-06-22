@@ -17,6 +17,9 @@ from django.utils.crypto import get_random_string
 from common.utils import custom_response,generate_otp
 from datetime import timedelta
 from django.utils import timezone
+from rest_framework.permissions import AllowAny
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
 User = CustomerUser  # Use this instead of get_user_model()
@@ -52,28 +55,163 @@ class CustomerLoginView(APIView):
         
 
 class CustomerUserSignupView(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Register a new user.",
+        request_body=CustomerUserSerializer,
+        responses={
+            201: openapi.Response(
+                description="User registered successfully",
+                examples={
+                    "application/json": {
+                        "status": 201,
+                        "message": "User registered successfully!",
+                        "data": {}
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Validation error",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Validation error",
+                        "data": {
+                            "email": ["This field is required."],
+                            "password": ["This field may not be blank."]
+                        }
+                    }
+                }
+            ),
+        }
+    )
+    
     def post(self, request):
         serializer = CustomerUserSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            return custom_response(
+                status_code=status.HTTP_201_CREATED,
+                message="User registered successfully!",
+                data={}
+            )
+        return custom_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Validation error",
+            data=serializer.errors
+        )
 
 # Update API - Update user details
 class CustomerUserUpdateView(generics.UpdateAPIView):
     serializer_class = CustomerUserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self):
-        """Return the logged-in user"""
-        return self.request.user 
+    @swagger_auto_schema(
+        operation_description="Update profile of the authenticated user.",
+        request_body=CustomerUserSerializer,
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="JWT token (Bearer <token>)",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Profile updated successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Profile updated successfully",
+                        "data": {
+                            "id": 1,
+                            "email": "user@example.com",
+                            "name": "Updated Name",
+                            "phone": "9876543210"
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Validation failed",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Validation failed",
+                        "data": {
+                            "phone": ["Phone number must be exactly 10 digits."]
+                        }
+                    }
+                }
+            )
+        }
+    )
+    def put(self, request):
+        user = request.user
+        serializer = CustomerUserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return custom_response(
+                status_code=status.HTTP_200_OK,
+                message="Profile updated successfully",
+                data=serializer.data
+            )
+        return custom_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Validation failed",
+            data=serializer.errors
+        )
 
 #api for fetching user profile
 class CustomerUserProfileView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
     
+    @swagger_auto_schema(
+        operation_description="Fetch the authenticated user's profile.",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="JWT token (Bearer <access_token>)",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Profile fetched successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Profile detail fetched successfully",
+                        "data": {
+                            "id": 1,
+                            "email": "user@example.com",
+                            "name": "John Doe",
+                            "phone": "+821012345678",
+                            "image": None,
+                            "date_joined": "2025-06-22 17:01",
+                            "updated_at": "2025-06-22 17:01",
+                            "is_verified": True,
+                            "wishlists": []
+                        }
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Unauthorized",
+                examples={
+                    "application/json": {
+                        "detail": "Authentication credentials were not provided."
+                    }
+                }
+            )
+        }
+    )
+
     def get(self, request):
         user = request.user
         serializer = CustomerUserProfileSerializer(user)
@@ -89,6 +227,56 @@ class CustomerUserImageUpdateView(APIView):
     authentication_classes = [CustomerUserJWTAuthentication]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
+    @swagger_auto_schema(
+        operation_description="update profile image for authenticated user.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                description="JWT token (Bearer <token>)",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                name='image',
+                in_=openapi.IN_FORM,
+                description='Image file to upload',
+                type=openapi.TYPE_FILE,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Image uploaded successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Image updated successfully",
+                        "data": {}
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Image not provided",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "No image provided",
+                        "data": {}
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Unauthorized",
+                examples={
+                    "application/json": {
+                        "detail": "Authentication credentials were not provided."
+                    }
+                }
+            )
+        }
+    )
+
     def patch(self, request):
         user = request.user
         print(request.user)
@@ -100,11 +288,59 @@ class CustomerUserImageUpdateView(APIView):
         user.image = image
         user.save()
 
-        return Response({'message': 'Image updated successfully'}, status=status.HTTP_200_OK)
+        return custom_response(
+                    status_code=status.HTTP_200_OK,
+                    message="Image updated successfully",
+                    data={}
+                )
+    
 
 #'user': user_data
+
 class CustomTokenRefreshView(TokenRefreshView):
+
+    permission_classes = [AllowAny]
     serializer_class = CustomTokenRefreshSerializer
+
+    @swagger_auto_schema(
+        operation_description="Refresh JWT access token using a refresh token.",
+        request_body=CustomTokenRefreshSerializer,
+        responses={
+            200: openapi.Response(
+                description="Tokens refreshed successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Token refreshed successfully",
+                        "data": {
+                            "token": "new-access-token",
+                            "refresh": "refresh-token"
+                        }
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Invalid or expired refresh token",
+                examples={
+                    "application/json": {
+                        "status": 401,
+                        "message": "Invalid refresh token",
+                        "data": {}
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={
+                    "application/json": {
+                        "status": 404,
+                        "message": "User not found",
+                        "data": {}
+                    }
+                }
+            )
+        }
+    )
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -127,14 +363,60 @@ class CustomTokenRefreshView(TokenRefreshView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({
-            'token': access_token,
-            'refresh': str(refresh_token),
-            
-        }, status=status.HTTP_200_OK)
+        return custom_response(
+            status_code=status.HTTP_200_OK,
+            message="Token refreshed successfully",
+            data={
+                "token": access_token,
+                "refresh": str(refresh_token),
+                # Optionally return user data
+                # "user": CustomerUserSerializer(user).data
+            }
+        )
 
 
 class GoogleSignupAPIView(APIView):
+     
+    @swagger_auto_schema(
+        operation_description="Signup or login user with Google OAuth2 ID token.",
+        request_body=GoogleSerializer,
+        responses={
+            200: openapi.Response(
+                description="Signup/Login successful",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "Signup successful",
+                        "data": {
+                            "id": 1,
+                            "email": "user@example.com",
+                            "name": "John Doe",
+                            "phone": None,
+                            "oauth_id": "google-oauth-id",
+                            "oauth_provider": "GOOGLE",
+                            "refresh": "refresh-token-string",
+                            "access_token": "access-token-string",
+                            "imageURL": "https://picture.url",
+                            "oauthProvider": "GOOGLE",
+                            "oauthId": "google-oauth-id",
+                            "providerId": "google-oauth-id"
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid Google ID token",
+                examples={
+                    "application/json": {
+                        "statusCode": 400,
+                        "message": "Invalid Google ID token",
+                        "data": {}
+                    }
+                }
+            )
+        }
+    )
+     
     def post(self, request):
         serializer = GoogleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -193,6 +475,37 @@ class GoogleSignupAPIView(APIView):
         
 
 class SendOTPView(APIView):
+    @swagger_auto_schema(
+        operation_description="Send OTP to the provided phone number. No authentication required.",
+        request_body=SendOTPSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP sent successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "OTP sent successfully",
+                        "data": {
+                            "otp": "123456"
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid phone number ",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Invalid phone number ex:+8289562314",
+                        "data": {
+                            "phone": ["This field is required."]
+                        }
+                    }
+                }
+            )
+        }
+    )
+
     def post(self, request):
         serializer = SendOTPSerializer(data=request.data)
         if not serializer.is_valid():
@@ -227,6 +540,32 @@ class SendOTPView(APIView):
     
 
 class VerifyOTPView(APIView):
+    
+    @swagger_auto_schema(
+        operation_description="Verify otp.",
+        request_body=VerifyOTPSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP verified successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message":"OTP verified successfully",
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid or expired OTP",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Invalid or expired OTP"
+                    }
+                }
+            )
+        }
+    )
+
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
         if not serializer.is_valid():
