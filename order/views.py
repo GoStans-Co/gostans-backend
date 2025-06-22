@@ -13,6 +13,8 @@ from .serializers import CartItemSerializer,AddToCartSerializer,RemovedCartItemS
 from .paypal_client import paypalrestsdk
 from rest_framework.views import APIView
 from django.db import transaction
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
 class AddToCartAPIView(generics.CreateAPIView):
@@ -21,6 +23,42 @@ class AddToCartAPIView(generics.CreateAPIView):
     serializer_class = AddToCartSerializer
     queryset = Cart.objects.all()
 
+    @swagger_auto_schema(
+        operation_description="Add a tour to the user's cart.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                description='JWT token (Bearer <token>)',
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                name='tour_id',
+                in_=openapi.IN_PATH,
+                description='UUID of the tour to add to cart',
+                type=openapi.TYPE_STRING,
+                format='uuid',
+                required=True,
+            ),
+        ],
+        request_body=AddToCartSerializer,
+        responses={
+            201: openapi.Response(
+                description="Tour added to cart successfully",
+                schema=CartItemSerializer,
+                # examples...
+            ),
+            200: openapi.Response(
+                description="Tour already in cart, quantity updated",
+                schema=CartItemSerializer,
+                # examples...
+            ),
+            400: openapi.Response(description="Validation error"),
+            401: openapi.Response(description="Unauthorized"),
+        }
+    )
+    
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -41,6 +79,62 @@ class RemoveFromCartAPIView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
     lookup_url_kwarg = 'tour_uuid'
+
+    @swagger_auto_schema(
+        operation_description="Remove a tour from the authenticated user's cart.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                description='JWT token (Bearer <token>)',
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                name='tour_uuid',
+                in_=openapi.IN_PATH,
+                description='UUID of the tour to remove from cart',
+                type=openapi.TYPE_STRING,
+                format='uuid',
+                required=True,
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Removed from cart",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Removed from cart",
+                        "data": {
+                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
+                            "message": "Removed from cart"
+                        }
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Item not found in cart",
+                examples={
+                    "application/json": {
+                        "status": 404,
+                        "message": "Item not found in cart",
+                        "data": {
+                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
+                        }
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Unauthorized",
+                examples={
+                    "application/json": {
+                        "detail": "Authentication credentials were not provided."
+                    }
+                }
+            )
+        }
+    )
 
     def delete(self, request, tour_uuid):
         customer = request.user
@@ -72,6 +166,58 @@ class CartListAPIView(generics.ListAPIView):
     authentication_classes = [CustomerUserJWTAuthentication]
     serializer_class = CartItemSerializer  
 
+    @swagger_auto_schema(
+        operation_description="Retrieve all items from the authenticated user's cart.",
+        manual_parameters=[
+            openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                description="JWT token (Bearer <token>)",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Cart items retrieved or cart is empty",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Cart items retrieved successfully",
+                        "data": [
+                            {
+                                "id": 1,
+                                "tour": {
+                                    "id": 12,
+                                    "title": "Jeju Island Tour",
+                                    "price": 150
+                                },
+                                "quantity": 2
+                            },
+                            {
+                                "id": 2,
+                                "tour": {
+                                    "id": 9,
+                                    "title": "Seoul Food Crawl",
+                                    "price": 80
+                                },
+                                "quantity": 1
+                            }
+                        ]
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Unauthorized",
+                examples={
+                    "application/json": {
+                        "detail": "Authentication credentials were not provided."
+                    }
+                }
+            )
+        }
+    )
+
     def list(self, request, *args, **kwargs):  
         customer = request.user
         cart_items = Cart.objects.filter(customer=customer).select_related('tour')
@@ -96,6 +242,72 @@ class CartListAPIView(generics.ListAPIView):
 class CreatePaymentView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
+
+    @swagger_auto_schema(
+        operation_description="Initiate a PayPal payment for a tour booking.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description='JWT Token in format: Bearer <token>',
+                required=True
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["amount", "tour_uuid", "participants"],
+            properties={
+                "amount": openapi.Schema(type=openapi.TYPE_NUMBER, format="float", description="Total payment amount"),
+                "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g. USD, EUR)", default="USD"),
+                "tour_uuid": openapi.Schema(type=openapi.TYPE_STRING, format="uuid", description="UUID of the selected tour"),
+                "participants": openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    description="List of participants",
+                    items=openapi.Items(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "first_name": openapi.Schema(type=openapi.TYPE_STRING),
+                            "last_name": openapi.Schema(type=openapi.TYPE_STRING),
+                            "id_type": openapi.Schema(type=openapi.TYPE_STRING),
+                            "id_number": openapi.Schema(type=openapi.TYPE_STRING),
+                            "date_of_birth": openapi.Schema(type=openapi.TYPE_STRING, format="date")
+                        },
+                        required=["first_name", "last_name", "id_type", "id_number", "date_of_birth"]
+                    )
+                )
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Payment created successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Payment created successfully",
+                        "data": {
+                            "booking_id": 123,
+                            "approval_url": "https://paypal.com/approve",
+                            "payment_id": "PAY-987654321"
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Validation error or PayPal error",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Validation failed",
+                        "data": {
+                            "amount": "Amount must be greater than zero.",
+                            "participants": "At least one participant is required."
+                        }
+                    }
+                }
+            )
+        }
+    )
 
     def post(self, request):
         amount = request.data.get("amount")
@@ -209,6 +421,70 @@ class ExecutePaymentView(APIView):
 
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
+
+    @swagger_auto_schema(
+        operation_description="Execute a PayPal payment after user approval.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description='JWT Token in format: Bearer <token>',
+                required=True
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["paymentId", "PayerID"],
+            properties={
+                "paymentId": openapi.Schema(type=openapi.TYPE_STRING, description="PayPal payment ID"),
+                "PayerID": openapi.Schema(type=openapi.TYPE_STRING, description="PayPal payer ID from redirect URL")
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Payment executed successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Payment completed successfully",
+                        "data": {
+                            "id": "PAY-123456789",
+                            "state": "approved",
+                            "payer": {
+                                "payment_method": "paypal",
+                                "status": "VERIFIED"
+                            },
+                            # Other PayPal response data...
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Validation failed or execution failed",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Validation failed",
+                        "data": {
+                            "paymentId": "This field is required.",
+                            "PayerID": "This field is required."
+                        }
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Booking not found",
+                examples={
+                    "application/json": {
+                        "status": 404,
+                        "message": "Booking not found",
+                        "data": {}
+                    }
+                }
+            )
+        }
+    )
 
     def post(self, request):
         payment_id = request.data.get("paymentId")

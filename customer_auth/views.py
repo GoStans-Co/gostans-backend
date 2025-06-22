@@ -34,6 +34,39 @@ def get_client_ip(request):
 
 
 class CustomerLoginView(APIView):
+
+    @swagger_auto_schema(
+        operation_description="User login to obtain JWT tokens.",
+        request_body=CustomerLoginSerializer,
+        responses={
+            200: openapi.Response(
+                description="Login successful",
+                examples={
+                    "application/json": {
+                        "token": "access-token-string",
+                        "refresh": "refresh-token-string",
+                        "ip_address": "203.0.113.1",
+                        "user": {
+                            "id": 1,
+                            "email": "user@example.com",
+                            "name": "John Doe",
+                            "phone": "1234567890"
+                            # Add other user fields if any
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Validation error or invalid credentials",
+                examples={
+                    "application/json": {
+                        "detail": "Invalid credentials"
+                    }
+                }
+            )
+        }
+    )
+
     def post(self, request):
         serializer = CustomerLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -217,7 +250,7 @@ class CustomerUserProfileView(APIView):
         serializer = CustomerUserProfileSerializer(user)
         return custom_response(
             status_code=status.HTTP_200_OK,
-            data={"data": serializer.data},
+            data=serializer.data,
             message="Profile detail fetched sucessfully"
         )
 
