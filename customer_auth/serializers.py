@@ -92,7 +92,14 @@ class CustomerUserProfileSerializer(serializers.ModelSerializer):
         return WishlistTourSerializer(wishlist_qs, many=True).data
 
     def to_representation(self, instance):
-        return super().to_representation(instance)
+        data = super().to_representation(instance)
+        # Rename date_joined to dateJoined
+        data['dateJoined'] = data.pop('date_joined', None)
+        data['isVerified'] = data.pop('is_verified', None)
+        data['updatedAt'] = data.pop('updated_at', None)
+        data['wishLists'] = data.pop('wishlists', None)
+
+        return data
 
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):

@@ -14,6 +14,9 @@ from customer_auth.authentication import CustomerUserJWTAuthentication
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 
 
 class WishlistPagination(PageNumberPagination):
@@ -149,6 +152,68 @@ class WishlistAddAPIView(APIView):
     lookup_field = 'uuid'
     lookup_url_kwarg = 'tour_uuid'
 
+    @swagger_auto_schema(
+        operation_description="Add a tour to the authenticated user's wishlist.",
+        manual_parameters=[
+            openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                description="JWT Token in format: Bearer <token>",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                name="tour_uuid",
+                in_=openapi.IN_PATH,
+                description="UUID of the tour to add to wishlist",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            201: openapi.Response(
+                description="Tour added to wishlist",
+                examples={
+                    "application/json": {
+                        "status": 201,
+                        "message": "Added to wishlist",
+                        "data": {
+                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
+                        }
+                    }
+                }
+            ),
+            200: openapi.Response(
+                description="Tour already in wishlist",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Already in wishlist",
+                        "data": {
+                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
+                        }
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Unauthorized",
+                examples={
+                    "application/json": {
+                        "detail": "Authentication credentials were not provided."
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Tour not found",
+                examples={
+                    "application/json": {
+                        "detail": "Not found."
+                    }
+                }
+            )
+        }
+    )
+    
     def post(self, request, tour_uuid):
         customer = request.user  # Assumes user is authenticated
         tour = get_object_or_404(Tour, uuid=tour_uuid)
