@@ -48,11 +48,48 @@ class TourListAPIView(generics.ListAPIView):
     # Search by title, short_description, or about fields (partial match)
     search_fields = ['title', 'short_description', 'about']
     
+    swagger_params = [
+        openapi.Parameter('country__id', openapi.IN_QUERY, description="Filter by Country ID", type=openapi.TYPE_INTEGER),
+        openapi.Parameter('city__id', openapi.IN_QUERY, description="Filter by City ID", type=openapi.TYPE_INTEGER),
+        openapi.Parameter('tour_type__id', openapi.IN_QUERY, description="Filter by Tour Type ID", type=openapi.TYPE_INTEGER),
+        openapi.Parameter('tags__slug', openapi.IN_QUERY, description="Filter by Tour Tag Slug", type=openapi.TYPE_STRING),
+        openapi.Parameter('search', openapi.IN_QUERY, description="Search by title, short_description, or about", type=openapi.TYPE_STRING),
+        openapi.Parameter('page', openapi.IN_QUERY, description="Page number for pagination", type=openapi.TYPE_INTEGER),
+        openapi.Parameter('page_size', openapi.IN_QUERY, description="Page size for pagination", type=openapi.TYPE_INTEGER),
+        openapi.Parameter('all', openapi.IN_QUERY, description="Set to true to retrieve all tours without pagination", type=openapi.TYPE_BOOLEAN),
+    ]
+
     def get_queryset(self):
         return Tour.objects.all() \
             .order_by('-created_at') \
             .prefetch_related('tags') \
             .select_related('country', 'city', 'tour_type')
+
+    @swagger_auto_schema(
+        manual_parameters=swagger_params,
+        responses={
+            200: openapi.Response(
+                description="List of tours (paginated or full list)",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "status_code": openapi.Schema(type=openapi.TYPE_INTEGER),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "count": openapi.Schema(type=openapi.TYPE_INTEGER, description="Total number of tours"),
+                                "next": openapi.Schema(type=openapi.TYPE_STRING, description="URL of next page", nullable=True),
+                                "previous": openapi.Schema(type=openapi.TYPE_STRING, description="URL of previous page", nullable=True),
+                                "results": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                            },
+                            description="Paginated list of tours or full list if ?all=true"
+                        ),
+                    }
+                )
+            )
+        }
+    )
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -125,6 +162,36 @@ class TourDetailAPIView(RetrieveAPIView):
     lookup_field = 'uuid'  # default is 'pk', you can use 'id' if you prefer
     lookup_url_kwarg = 'tour_uuid'
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'tour_uuid',
+                openapi.IN_PATH,
+                description="UUID of the Tour to retrieve",
+                type=openapi.TYPE_STRING,
+                format='uuid',
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Tour details retrieved successfully",
+                schema=TourDetailSerializer()
+            ),
+            404: openapi.Response(
+                description="Tour not found",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "status_code": openapi.Schema(type=openapi.TYPE_INTEGER),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(type=openapi.TYPE_OBJECT),
+                    }
+                )
+            )
+        }
+    )
+    
     def retrieve(self, request, *args, **kwargs):
         lookup_value = self.kwargs.get(self.lookup_url_kwarg)
 
