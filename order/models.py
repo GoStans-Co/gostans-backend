@@ -69,4 +69,8 @@ class BookingParticipant(models.Model):
     date_of_birth = models.DateField()
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.booking.tour.title})"
+        return ""
+    
+    class Meta:
+        verbose_name = "Participant"
+        verbose_name_plural = "Participants"

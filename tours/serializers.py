@@ -92,3 +92,8 @@ class WishlistTourSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wishlist
         fields = ['id','uuid','title','tour_type','main_image']
+
+
+class RemovedWishlistItemSerializer(serializers.Serializer):
+    tour_uuid = serializers.UUIDField()
+    message = serializers.CharField()

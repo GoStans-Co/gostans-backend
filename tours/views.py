@@ -4,7 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from common.utils import custom_response
 from .models import Wishlist,Tour
-from .serializers import TourListSerializer,TourDetailSerializer,WishlistAddSerializer, WishlistTourSerializer
+from .serializers import TourListSerializer,TourDetailSerializer,WishlistAddSerializer, WishlistTourSerializer,RemovedWishlistItemSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
 from rest_framework import status
@@ -16,7 +16,6 @@ from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
 
 
 class WishlistPagination(PageNumberPagination):
@@ -403,4 +402,107 @@ class WishlistListAPIView(generics.ListAPIView):
             status_code=status.HTTP_200_OK,
             message="Wishlist retrieved successfully",
             data={"results": serializer.data}
+        )
+
+
+
+class RemoveFromWishlistAPIView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    @swagger_auto_schema(
+        operation_description="Remove a tour from the authenticated user's wishlist.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                description='JWT token (Bearer <token>)',
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                name='tour_uuid',
+                in_=openapi.IN_PATH,
+                description='UUID of the tour to remove from wishlist/Add "all" to remove all',
+                type=openapi.TYPE_STRING,
+                format='uuid',
+                required=True,
+            )
+           
+        ],
+        responses={
+            200: openapi.Response(
+                description="Removed from wishlist",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Removed from wishlist",
+                        "data": {
+                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
+                            "message": "Removed from wishlist"
+                        }
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Item not found in wishlist",
+                examples={
+                    "application/json": {
+                        "status": 404,
+                        "message": "Item not found in wishlist",
+                        "data": {
+                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
+                        }
+                    }
+                }
+            ),
+            401: openapi.Response(
+                description="Unauthorized",
+                examples={
+                    "application/json": {
+                        "detail": "Authentication credentials were not provided."
+                    }
+                }
+            )
+        }
+    )
+
+    def delete(self, request, tour_uuid):
+        customer = request.user
+        tour_uuid = request.query_params.get("tour_uuid")
+        if not tour_uuid:
+            return custom_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="tour_uuid is required",
+                data={}
+            )
+        tour = get_object_or_404(Tour, uuid=tour_uuid)
+        if tour_uuid == "all":
+            deleted_count, _ = Wishlist.objects.filter(customer=customer).delete()
+            return custom_response(
+                status_code=status.HTTP_200_OK,
+                message="All wishlist items removed",
+                data={"deleted_count": deleted_count}
+            )
+        
+        
+        wishlist_item = Wishlist.objects.filter(customer=customer, tour=tour).first()
+        if wishlist_item:
+            wishlist_item.delete()
+
+            serializer = RemovedWishlistItemSerializer({
+                "tour_uuid": tour.uuid,
+                "message": "Removed from wishlist"
+            })
+
+            return custom_response(
+                status_code=status.HTTP_200_OK,
+                message="Removed from wishlist",
+                data=serializer.data
+            )
+
+        return custom_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Item not found in wishlist",
+            data={"tour_uuid": tour.uuid}
         )

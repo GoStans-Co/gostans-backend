@@ -15,6 +15,9 @@ from rest_framework.views import APIView
 from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+import json
 
 
 class AddToCartAPIView(generics.CreateAPIView):
@@ -352,8 +355,8 @@ class CreatePaymentView(APIView):
             "intent": "sale",
             "payer": {"payment_method": "paypal"},
             "redirect_urls": {
-                "return_url": "https://xplore-asia.web.app/payment-success",
-                "cancel_url": "https://xplore-asia.web.app/payment-cancel"
+                "return_url": "https://gostans.com/payment-success",
+                "cancel_url": "https://gostans.com/payment-cancel"
             },
             "transactions": [{
                 "amount": {"total": f"{amount}", "currency": currency},
@@ -543,3 +546,66 @@ class ExecutePaymentView(APIView):
                 message="Payment execution failed",
                 data=payment.error
             )
+
+
+class PayPalWebhookView(APIView):
+    authentication_classes = []  
+    permission_classes = []
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super(PayPalWebhookView, self).dispatch(*args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            event_body = json.loads(request.body)
+        except json.JSONDecodeError:
+            return custom_response(
+                status_code=400,
+                message="Invalid JSON in request body",
+                data={}
+            )
+
+        event_type = event_body.get("event_type")
+        resource = event_body.get("resource", {})
+
+        payment_id = resource.get("parent_payment") or resource.get("id")
+
+        if not payment_id:
+            return custom_response(
+                status_code=400,
+                message="Payment ID not found in resource",
+                data={}
+            )
+
+        try:
+            booking = TourBooking.objects.get(payment_id=payment_id)
+        except TourBooking.DoesNotExist:
+            return custom_response(
+                status_code=404,
+                message="Booking not found for payment_id",
+                data={"payment_id": payment_id}
+            )
+
+        # Handle webhook event types
+        status_map = {
+            "PAYMENT.SALE.COMPLETED": "Booked",
+            "PAYMENT.SALE.DENIED": "Denied",
+            "PAYMENT.SALE.REFUNDED": "Refunded",
+            "PAYMENT.SALE.REVERSED": "Reversed"
+        }
+
+        if event_type in status_map:
+            booking.status = status_map[event_type]
+            booking.save()
+            return custom_response(
+                status_code=200,
+                message=f"Booking status updated to {status_map[event_type]}",
+                data={"booking_id": booking.id, "status": booking.status}
+            )
+
+        return custom_response(
+            status_code=200,
+            message="Unhandled event type received",
+            data={"event_type": event_type}
+        )

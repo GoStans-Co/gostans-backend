@@ -10,13 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-from decouple import config,Csv
+from decouple import Config, RepositoryEnv
 import os
 from pathlib import Path
 from datetime import timedelta
 from django.utils.translation import gettext_lazy as _
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+config = Config(RepositoryEnv('.env'))
 
 
 # Quick-start development settings - unsuitable for production
@@ -82,7 +84,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://xplore-asia.web.app",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "https://gostans.com"
 
 ]
 
