@@ -7,6 +7,6 @@ urlpatterns = [
     path('tours/<uuid:tour_uuid>/', TourDetailAPIView.as_view(), name='tour-detail'),
     path('wishlist/add/<uuid:tour_uuid>/', WishlistAddAPIView.as_view(), name='wishlist-add'),
     path('wishlist/', WishlistListAPIView.as_view(), name='wishlist-list'),
-    path('wishlist/delete/<uuid:tour_uuid>/', RemoveFromWishlistAPIView.as_view(), name='wishlist-delete'),
+    path('wishlist/delete/<str:tour_uuid>/', RemoveFromWishlistAPIView.as_view(), name='wishlist-delete'),
 
 ]

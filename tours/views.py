@@ -484,23 +484,23 @@ class RemoveFromWishlistAPIView(generics.DestroyAPIView):
 
     def delete(self, request, tour_uuid):
         customer = request.user
-        tour_uuid = request.query_params.get("tour_uuid")
         if not tour_uuid:
             return custom_response(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 message="tour_uuid is required",
                 data={}
             )
-        tour = get_object_or_404(Tour, uuid=tour_uuid)
-        if tour_uuid == "all":
+
+        if str(tour_uuid) == "all":
             deleted_count, _ = Wishlist.objects.filter(customer=customer).delete()
             return custom_response(
                 status_code=status.HTTP_200_OK,
                 message="All wishlist items removed",
                 data={"deleted_count": deleted_count}
             )
-        
-        
+
+        tour = get_object_or_404(Tour, uuid=tour_uuid)
+
         wishlist_item = Wishlist.objects.filter(customer=customer, tour=tour).first()
         if wishlist_item:
             wishlist_item.delete()
@@ -519,5 +519,5 @@ class RemoveFromWishlistAPIView(generics.DestroyAPIView):
         return custom_response(
             status_code=status.HTTP_404_NOT_FOUND,
             message="Item not found in wishlist",
-            data={"tour_uuid": tour.uuid}
+            data={"tour_uuid": tour_uuid}
         )
