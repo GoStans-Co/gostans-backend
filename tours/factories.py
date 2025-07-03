@@ -79,7 +79,19 @@ class TourTypeFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = TourType
 
-    name = factory.Faker('word')
+    # name = factory.Faker('word')
+    name = factory.Iterator([
+        'Adventure',
+        'Cultural',
+        'Wildlife',
+        'Beach',
+        'Historical',
+        'Luxury',
+        'Backpacking',
+        'Cruise',
+        'Eco Tour',
+        'Hiking'
+    ])
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):

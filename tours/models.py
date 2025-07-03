@@ -9,6 +9,19 @@ from smart_selects.db_fields import ChainedForeignKey
 from common.utils import get_coordinates
 
 
+# destination logic 
+class Destination(models.Model):
+    name = models.CharField(max_length=255)
+    country = models.ForeignKey(Country, on_delete=models.CASCADE)
+    city = models.ForeignKey(City, on_delete=models.CASCADE)
+    image_url = models.URLField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.city.name}, {self.country.name})"
+
+    class Meta:
+        unique_together = ('name', 'city', 'country')
+
 class TourType(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -95,6 +108,15 @@ class Tour(models.Model):
     tags = models.ManyToManyField('TourTag', related_name='tours', blank=True)
     main_image = models.ImageField(upload_to='tours/main_images/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Analytics & Trending Fields
+    view_count = models.PositiveIntegerField(default=0, help_text="Total number of times this tour has been viewed")
+    booking_count = models.PositiveIntegerField(default=0, help_text="Total number of bookings for this tour")
+    rating_average = models.DecimalField(max_digits=3, decimal_places=2, default=0.0, help_text="Average rating out of 5")
+    rating_count = models.PositiveIntegerField(default=0, help_text="Total number of ratings received")
+    last_booked_at = models.DateTimeField(null=True, blank=True, help_text="When this tour was last booked")
+    trending_score = models.FloatField(default=0.0, help_text="Calculated score for trending algorithm")
+    destination = models.ForeignKey(Destination, on_delete=models.SET_NULL, null=True, blank=True, related_name='tours')
+
 
     def get_price(self, age_category='adult'):
         if self.use_detailed_pricing:
@@ -174,4 +196,25 @@ class Wishlist(models.Model):
         return f"{self.customer.email} - {self.tour.title}"
 
 
+
+
+class TourAnalytics(models.Model):
+    EVENT_TYPES = [
+        ('view', 'View'),
+        ('booking', 'Booking'),
+        ('search', 'Search'),
+        ('wishlist_add', 'Wishlist Add'),
+        ('engagement', 'Engagement'),
+    ]
+
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='analytics')
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    session_id = models.CharField(max_length=100, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.event_type} on {self.tour.title} at {self.timestamp}"
 

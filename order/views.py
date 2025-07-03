@@ -5,9 +5,9 @@ from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from customer_auth.authentication import CustomerUserJWTAuthentication
-from common.utils import custom_response
-from tours.models import Tour
-from .models import Cart,TourBooking,BookingParticipant
+from common.utils import custom_response,get_client_ip
+from tours.models import Tour,TourAnalytics
+from .models import Cart,TourBooking,BookingParticipant,Payment
 from tours.serializers import TourListSerializer  
 from .serializers import CartItemSerializer,AddToCartSerializer,RemovedCartItemSerializer
 from .paypal_client import paypalrestsdk
@@ -18,6 +18,7 @@ from drf_yasg import openapi
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import json
+from django.db.models import F
 
 
 class AddToCartAPIView(generics.CreateAPIView):
@@ -374,13 +375,23 @@ class CreatePaymentView(APIView):
                     payment_id=payment.id,
                     amount=amount,
                     currency=currency,
-                    status="PENDING",
+                    status="PENDING", #this column for booking status ,"pending" as initiating payment 
                     trip_start_date=tour.trip_start_date,
                     trip_end_date=tour.trip_end_date,
                     country=tour.country,
                     city=tour.city
                 )
-
+                
+                # storing payment history
+                Payment.objects.create(
+                    booking=booking,
+                    payment_id=payment.id,
+                    amount=amount,
+                    currency=currency,
+                    status="PENDING", # this status is for payment status,
+                    payment_method="paypal"
+                )
+                
                 for idx, p in enumerate(participants):
                     print(f"Participant {idx+1} data: {p}")
                     missing_fields = [k for k in ("first_name", "last_name", "id_type", "id_number", "date_of_birth") if not p.get(k)]
@@ -509,6 +520,24 @@ class ExecutePaymentView(APIView):
         payment = paypalrestsdk.Payment.find(payment_id)
 
         if payment.execute({"payer_id": payer_id}):
+
+            try:
+                payment_record = Payment.objects.get(payment_id=payment_id)
+            except Payment.DoesNotExist:
+                return custom_response(404, "Payment record not found", {})
+
+            # Update Payment record
+            payment_record.status = "COMPLETED"
+            payment_record.payer_id = payer_id
+
+            try:
+                sale = payment.transactions[0].related_resources[0].sale
+                payment_record.paypal_txn_id = sale.id
+            except (IndexError, AttributeError):
+                pass
+            payment_record.details = payment.to_dict()
+            payment_record.save()
+
             # Find corresponding booking
             try:
                 booking = TourBooking.objects.get(payment_id=payment_id)
@@ -527,13 +556,25 @@ class ExecutePaymentView(APIView):
                 pass
 
             booking.save()
+            # increasing booking count on Tour atomically
+            Tour.objects.filter(pk=booking.tour.pk).update(booking_count=F('booking_count') + 1)
 
+            # hnadeling analytics for booking .....
+            TourAnalytics.objects.create(
+                tour=booking.tour,
+                event_type='booking',
+                user=booking.customer,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                session_id=request.session.session_key
+            )
             return custom_response(
                 status_code=200,
                 message="Payment completed successfully",
                 data=payment.to_dict()
             )
         else:
+            # Marking booking as cancelled if payment failed....
             try:
                 booking = TourBooking.objects.get(payment_id=payment_id)
                 booking.status = "Cancelled"
@@ -587,6 +628,11 @@ class PayPalWebhookView(APIView):
                 data={"payment_id": payment_id}
             )
 
+        try:
+            payment_record = Payment.objects.get(payment_id=payment_id)
+        except Payment.DoesNotExist:
+            return custom_response(404, "Payment record not found", {"payment_id": payment_id})
+
         # Handle webhook event types
         status_map = {
             "PAYMENT.SALE.COMPLETED": "Booked",
@@ -595,9 +641,27 @@ class PayPalWebhookView(APIView):
             "PAYMENT.SALE.REVERSED": "Reversed"
         }
 
+        # handeling even in webhook
         if event_type in status_map:
-            booking.status = status_map[event_type]
-            booking.save()
+            new_status = status_map[event_type]
+            payment_record.status = new_status
+            payment_record.save()
+
+            booking =payment_record.booking
+            if new_status == "COMPLETED":
+                booking.status = "BOOKED" #tour booking done with payment
+                booking.save()
+                # If booking is now confirmed, increment booking count & log analytics
+                Tour.objects.filter(pk=booking.tour.pk).update(booking_count=F('booking_count') + 1)
+                TourAnalytics.objects.create(
+                    tour=booking.tour,
+                    event_type='booking',
+                    user=booking.customer,
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    session_id=request.session.session_key
+                )
+
             return custom_response(
                 status_code=200,
                 message=f"Booking status updated to {status_map[event_type]}",

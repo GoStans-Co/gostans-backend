@@ -2,8 +2,8 @@ from rest_framework import generics,permissions
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from common.utils import custom_response
-from .models import Wishlist,Tour
+from common.utils import custom_response,get_client_ip
+from .models import Wishlist,Tour,TourAnalytics
 from .serializers import TourListSerializer,TourDetailSerializer,WishlistAddSerializer, WishlistTourSerializer,RemovedWishlistItemSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
@@ -16,6 +16,9 @@ from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.db.models import F
+
+
 
 
 class WishlistPagination(PageNumberPagination):
@@ -196,6 +199,9 @@ class TourDetailAPIView(RetrieveAPIView):
 
         try:
             instance = self.get_queryset().get(**{self.lookup_field: lookup_value})
+            # Increment view_count atomically
+            Tour.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
+            instance.refresh_from_db()
         except Tour.DoesNotExist:
             return custom_response(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -203,12 +209,21 @@ class TourDetailAPIView(RetrieveAPIView):
                 data={}
             )
 
+        TourAnalytics.objects.create(
+            tour=tour,
+            event_type='view',
+            user=request.user if request.user.is_authenticated else None,
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            session_id=request.session.session_key
+        )
         serializer = self.get_serializer(instance)
         return custom_response(
             status_code=status.HTTP_200_OK,
             message="Tour details retrieved successfully.",
             data=serializer.data
         )
+    
 
 
 class WishlistAddAPIView(APIView):

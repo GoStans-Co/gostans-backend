@@ -74,3 +74,18 @@ class BookingParticipant(models.Model):
     class Meta:
         verbose_name = "Participant"
         verbose_name_plural = "Participants"
+
+class Payment(models.Model):
+    booking = models.ForeignKey(TourBooking, on_delete=models.CASCADE, related_name="payments")
+    payment_id = models.CharField(max_length=255, unique=True)  # paypal payment id or gateway txn id
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=10)
+    status = models.CharField(max_length=50)  # e.g., 'PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'
+    payment_method = models.CharField(max_length=50, default='paypal')
+    payer_id = models.CharField(max_length=255, blank=True, null=True)  # PayPal payer ID
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    details = models.JSONField(blank=True, null=True)  # To store raw payment gateway response for audit
+
+    def __str__(self):
+        return f"Payment {self.payment_id} for Booking {self.booking.id}"
