@@ -210,7 +210,7 @@ class TourDetailAPIView(RetrieveAPIView):
             )
 
         TourAnalytics.objects.create(
-            tour=tour,
+            tour=instance,
             event_type='view',
             user=request.user if request.user.is_authenticated else None,
             ip_address=get_client_ip(request),
