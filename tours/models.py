@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from multiselectfield import MultiSelectField
 from smart_selects.db_fields import ChainedForeignKey
 from common.utils import get_coordinates
-
+from customer_auth.models import CustomerUser
 
 # destination logic 
 class Destination(models.Model):
@@ -209,7 +209,7 @@ class TourAnalytics(models.Model):
 
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='analytics')
     event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    user = models.ForeignKey(CustomerUser, null=True, blank=True, on_delete=models.SET_NULL)
     timestamp = models.DateTimeField(auto_now_add=True)
     session_id = models.CharField(max_length=100, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
