@@ -3,14 +3,14 @@ from rest_framework.response import Response
 from django.conf import settings
 import random
 from django.utils.timezone import now, timedelta
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Sum, Avg, Q, F
 
-def custom_response(status_code=200, message="Success", data=None):
+def custom_response(statusCode=200, message="Success", data=None):
     return Response({
-        "statuscode": status_code,
+        "statusCode": statusCode,
         "message": message,
         "data": data if data is not None else {}
-    }, status=status_code)
+    }, status=statusCode)
 
 
 def get_coordinates(location_name):
@@ -19,14 +19,12 @@ def get_coordinates(location_name):
     params = {'address': location_name, 'key': api_key}
     response = requests.get(endpoint, params=params)
 
-    if response.status_code == 200:
+    if response.statusCode == 200:
         results = response.json().get('results')
         if results:
             loc = results[0]['geometry']['location']
             return loc['lat'], loc['lng']
     return None, None
-
-
 
 def generate_otp(length=4):
     return ''.join(str(random.randint(0, 9)) for _ in range(length))
@@ -46,7 +44,6 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
-
 
 
 def calculate_trending_score():
@@ -82,3 +79,33 @@ def calculate_trending_score():
 
         tour.trending_score = score
         tour.save(update_fields=['trending_score'])
+
+
+
+def calculate_top_destinations():
+    from tours.models import Tour, Destination
+
+    thirty_days_ago = now() - timedelta(days=30)
+
+    destinations = Destination.objects.annotate(
+        tour_count=Count('tours'),
+        total_bookings=Sum('tours__booking_count'),
+        avg_rating=Avg('tours__rating_average'),
+        recent_bookings=Sum(
+            Case(
+                When(tours__analytics__event_type='booking', tours__analytics__timestamp__gte=thirty_days_ago, then=1),
+                default=0,
+                output_field=IntegerField()
+            )
+        )
+    ).annotate(
+        popularity_score=(
+            0.3 * F('tour_count') +
+            0.4 * F('total_bookings') +
+            0.2 * F('avg_rating') +
+            0.1 * F('recent_bookings')
+        )
+    ).order_by('-popularity_score')
+
+    return destinations
+

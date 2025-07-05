@@ -1,30 +1,22 @@
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from rest_framework import generics,permissions
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from common.utils import custom_response,get_client_ip
-from .models import Wishlist,Tour,TourAnalytics
-from .serializers import TourListSerializer,TourDetailSerializer,WishlistAddSerializer, WishlistTourSerializer,RemovedWishlistItemSerializer
+from .models import Tour,TourAnalytics,TourRating
+from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from customer_auth.authentication import CustomerUserJWTAuthentication
-from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from django.db.models import F
+from django.db.models import F,Count,Avg
 
-
-
-
-class WishlistPagination(PageNumberPagination):
-    page_size = 5  # Default 5 items
-    page_size_query_param = 'page_size'  # Optional: allow clients to override
-    max_page_size = 10 
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 5
@@ -68,6 +60,8 @@ class TourListAPIView(generics.ListAPIView):
             .select_related('country', 'city', 'tour_type')
 
     @swagger_auto_schema(
+        operation_description="Public.",
+        tags=["Public APIs"],
         manual_parameters=swagger_params,
         responses={
             200: openapi.Response(
@@ -75,7 +69,7 @@ class TourListAPIView(generics.ListAPIView):
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
-                        "status_code": openapi.Schema(type=openapi.TYPE_INTEGER),
+                        "statusCode": openapi.Schema(type=openapi.TYPE_INTEGER),
                         "message": openapi.Schema(type=openapi.TYPE_STRING),
                         "data": openapi.Schema(
                             type=openapi.TYPE_OBJECT,
@@ -92,6 +86,8 @@ class TourListAPIView(generics.ListAPIView):
             )
         }
     )
+    def get(self, request, *args, **kwargs):  
+        return self.list(request, *args, **kwargs)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -99,7 +95,7 @@ class TourListAPIView(generics.ListAPIView):
 
         if total_count == 0:
             return custom_response(
-                status_code=status.HTTP_200_OK,
+                statusCode=status.HTTP_200_OK,
                 message="No tours available.",
                 data={
                     "count": 0,
@@ -113,7 +109,7 @@ class TourListAPIView(generics.ListAPIView):
         if request.query_params.get("all") == "true":
             serializer = self.get_serializer(queryset, many=True)
             return custom_response(
-                status_code=status.HTTP_200_OK,
+                statusCode=status.HTTP_200_OK,
                 message="All tours retrieved successfully (no pagination)",
                 data={
                     "count": total_count,
@@ -126,7 +122,7 @@ class TourListAPIView(generics.ListAPIView):
             page = self.paginate_queryset(queryset)
         except NotFound:
             return custom_response(
-                status_code=404,
+                statusCode=404,
                 message="Invalid page number.",
                 data={}
             )
@@ -137,7 +133,7 @@ class TourListAPIView(generics.ListAPIView):
             # Inject `count` manually into paginated response
             paginated_data['count'] = total_count
             return custom_response(
-                status_code=status.HTTP_200_OK,
+                statusCode=status.HTTP_200_OK,
                 message="Paginated tours retrieved successfully",
                 data=paginated_data
             )
@@ -145,7 +141,7 @@ class TourListAPIView(generics.ListAPIView):
         # Fallback: no pagination
         serializer = self.get_serializer(queryset, many=True)
         return custom_response(
-            status_code=status.HTTP_200_OK,
+            statusCode=status.HTTP_200_OK,
             message="Tour list retrieved successfully",
             data={
                 "count": total_count,
@@ -165,6 +161,8 @@ class TourDetailAPIView(RetrieveAPIView):
     lookup_url_kwarg = 'tour_uuid'
 
     @swagger_auto_schema(
+        operation_description="Public.",
+        tags=["Public APIs"],
         manual_parameters=[
             openapi.Parameter(
                 'tour_uuid',
@@ -185,7 +183,7 @@ class TourDetailAPIView(RetrieveAPIView):
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
-                        "status_code": openapi.Schema(type=openapi.TYPE_INTEGER),
+                        "statusCode": openapi.Schema(type=openapi.TYPE_INTEGER),
                         "message": openapi.Schema(type=openapi.TYPE_STRING),
                         "data": openapi.Schema(type=openapi.TYPE_OBJECT),
                     }
@@ -194,7 +192,7 @@ class TourDetailAPIView(RetrieveAPIView):
         }
     )
     
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         lookup_value = self.kwargs.get(self.lookup_url_kwarg)
 
         try:
@@ -204,7 +202,7 @@ class TourDetailAPIView(RetrieveAPIView):
             instance.refresh_from_db()
         except Tour.DoesNotExist:
             return custom_response(
-                status_code=status.HTTP_404_NOT_FOUND,
+                statusCode=status.HTTP_404_NOT_FOUND,
                 message="Tour not found.",
                 data={}
             )
@@ -219,305 +217,47 @@ class TourDetailAPIView(RetrieveAPIView):
         )
         serializer = self.get_serializer(instance)
         return custom_response(
-            status_code=status.HTTP_200_OK,
+            statusCode=status.HTTP_200_OK,
             message="Tour details retrieved successfully.",
             data=serializer.data
         )
     
-
-
-class WishlistAddAPIView(APIView):
-
+class SubmitRatingView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomerUserJWTAuthentication]
-    lookup_field = 'uuid'
-    lookup_url_kwarg = 'tour_uuid'
 
     @swagger_auto_schema(
-        operation_description="Add a tour to the authenticated user's wishlist.",
-        manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                description="JWT Token in format: Bearer <token>",
-                type=openapi.TYPE_STRING,
-                required=True
-            ),
-            openapi.Parameter(
-                name="tour_uuid",
-                in_=openapi.IN_PATH,
-                description="UUID of the tour to add to wishlist",
-                type=openapi.TYPE_STRING,
-                required=True
-            )
-        ],
-        responses={
-            201: openapi.Response(
-                description="Tour added to wishlist",
-                examples={
-                    "application/json": {
-                        "status": 201,
-                        "message": "Added to wishlist",
-                        "data": {
-                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
-                        }
-                    }
-                }
-            ),
-            200: openapi.Response(
-                description="Tour already in wishlist",
-                examples={
-                    "application/json": {
-                        "status": 200,
-                        "message": "Already in wishlist",
-                        "data": {
-                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
-                        }
-                    }
-                }
-            ),
-            401: openapi.Response(
-                description="Unauthorized",
-                examples={
-                    "application/json": {
-                        "detail": "Authentication credentials were not provided."
-                    }
-                }
-            ),
-            404: openapi.Response(
-                description="Tour not found",
-                examples={
-                    "application/json": {
-                        "detail": "Not found."
-                    }
-                }
-            )
-        }
+        operation_description="Submit or update a tour rating",
+        request_body=TourRatingSerializer,
+        tags=["User Controller"]
     )
-
+    
     def post(self, request, tour_uuid):
-        customer = request.user  # Assumes user is authenticated
-        tour = get_object_or_404(Tour, uuid=tour_uuid)
-
-        wishlist, created = Wishlist.objects.get_or_create(customer=customer, tour=tour)
-
-        if created:
-            return custom_response(
-                status_code=status.HTTP_201_CREATED,
-                message="Added to wishlist",
-                data={"tour_uuid": tour.uuid}
-            )
-        else:
-            return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="Already in wishlist",
-                data={"tour_uuid": tour.uuid}
-            )
-
-
-class WishlistListAPIView(generics.ListAPIView):
-    serializer_class = WishlistTourSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CustomerUserJWTAuthentication]
-    pagination_class = WishlistPagination
-
-    @swagger_auto_schema(
-        operation_description="Retrieve the authenticated user's wishlist.",
-        manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="JWT token in format: Bearer <token>",
-                required=True
-            ),
-            openapi.Parameter(
-                name="page",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_INTEGER,
-                description="Page number for paginated results"
-            )
-        ],
-        responses={
-            200: openapi.Response(
-                description="Wishlist retrieved or empty",
-                examples={
-                    "application/json": {
-                        "status": 200,
-                        "message": "Wishlist retrieved successfully",
-                        "data": {
-                            "count": 1,
-                            "next": None,
-                            "previous": None,
-                            "results": [
-                                {
-                                    "uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
-                                    "tour": {
-                                        "title": "Jeju Island Adventure",
-                                        "price": 150.0,
-                                        "duration": "3 days"
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ),
-            404: openapi.Response(
-                description="Invalid page number",
-                examples={
-                    "application/json": {
-                        "status": 404,
-                        "message": "Invalid page number.",
-                        "data": {}
-                    }
-                }
-            )
-        }
-    )
-
-    def get_queryset(self):
-        return Wishlist.objects.filter(customer=self.request.user).select_related('tour')
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-
-        if not queryset.exists():
-            return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="Your wishlist is empty.",
-                data={
-                    "count": 0,
-                    "next": None,
-                    "previous": None,
-                    "results": []
-                }
-            )
-
         try:
-            page = self.paginate_queryset(queryset)
-        except NotFound:
-            return custom_response(
-                status_code=status.HTTP_404_NOT_FOUND,
-                message="Invalid page number.",
-                data={}
+            tour = Tour.objects.get(uuid=tour_uuid)
+        except Tour.DoesNotExist:
+            return custom_response(404, "Tour not found", {})
+
+        serializer = TourRatingSerializer(data=request.data)
+        if serializer.is_valid():
+            rating_obj, created = TourRating.objects.update_or_create(
+                tour=tour,
+                user=request.user,
+                defaults=serializer.validated_data
             )
 
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            paginated_data = self.get_paginated_response(serializer.data).data
-            return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="Wishlist retrieved successfully",
-                data=paginated_data
-            )
-
-        serializer = self.get_serializer(queryset, many=True)
-        return custom_response(
-            status_code=status.HTTP_200_OK,
-            message="Wishlist retrieved successfully",
-            data={"results": serializer.data}
-        )
-
-
-
-class RemoveFromWishlistAPIView(generics.DestroyAPIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CustomerUserJWTAuthentication]
-
-    @swagger_auto_schema(
-        operation_description="Remove a tour from the authenticated user's wishlist.",
-        manual_parameters=[
-            openapi.Parameter(
-                name='Authorization',
-                in_=openapi.IN_HEADER,
-                description='JWT token (Bearer <token>)',
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                name='tour_uuid',
-                in_=openapi.IN_PATH,
-                description='UUID of the tour to remove from wishlist/Add "all" to remove all',
-                type=openapi.TYPE_STRING,
-                format='uuid',
-                required=True,
-            )
-           
-        ],
-        responses={
-            200: openapi.Response(
-                description="Removed from wishlist",
-                examples={
-                    "application/json": {
-                        "status": 200,
-                        "message": "Removed from wishlist",
-                        "data": {
-                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
-                            "message": "Removed from wishlist"
-                        }
-                    }
-                }
-            ),
-            404: openapi.Response(
-                description="Item not found in wishlist",
-                examples={
-                    "application/json": {
-                        "status": 404,
-                        "message": "Item not found in wishlist",
-                        "data": {
-                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
-                        }
-                    }
-                }
-            ),
-            401: openapi.Response(
-                description="Unauthorized",
-                examples={
-                    "application/json": {
-                        "detail": "Authentication credentials were not provided."
-                    }
-                }
-            )
-        }
-    )
-
-    def delete(self, request, tour_uuid):
-        customer = request.user
-        if not tour_uuid:
-            return custom_response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="tour_uuid is required",
-                data={}
-            )
-
-        if str(tour_uuid) == "all":
-            deleted_count, _ = Wishlist.objects.filter(customer=customer).delete()
-            return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="All wishlist items removed",
-                data={"deleted_count": deleted_count}
-            )
-
-        tour = get_object_or_404(Tour, uuid=tour_uuid)
-
-        wishlist_item = Wishlist.objects.filter(customer=customer, tour=tour).first()
-        if wishlist_item:
-            wishlist_item.delete()
-
-            serializer = RemovedWishlistItemSerializer({
-                "tour_uuid": tour.uuid,
-                "message": "Removed from wishlist"
-            })
+            # Recalculate average and count
+            stats = tour.ratings.aggregate(avg=Avg('rating'), count=Count('rating'))
+            tour.rating_average = round(stats['avg'] or 0, 2)
+            tour.rating_count = stats['count']
+            tour.save()
 
             return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="Removed from wishlist",
+                statusCode=200,
+                message="Rating submitted successfully",
                 data=serializer.data
             )
 
-        return custom_response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Item not found in wishlist",
-            data={"tour_uuid": tour_uuid}
-        )
+        return custom_response(400, "Invalid data", serializer.errors)
+
+

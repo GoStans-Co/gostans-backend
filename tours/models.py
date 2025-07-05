@@ -57,7 +57,6 @@ class TourPricing(models.Model):
     def __str__(self):
         return f"{self.tour.title} - {self.age_category}: {self.price}"
 
-
 class Tour(models.Model):
     id = models.AutoField(primary_key=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -147,14 +146,12 @@ class IncludedItem(models.Model):
     def __str__(self):
         return f"Included: {self.text}"
 
-
 class ExcludedItem(models.Model):
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='excluded_items')
     text = models.CharField(max_length=255)
 
     def __str__(self):
         return f"Excluded: {self.text}"
-
 
 class Itinerary(models.Model):
     tour = models.ForeignKey(Tour, related_name='itineraries', on_delete=models.CASCADE)
@@ -183,7 +180,6 @@ class Itinerary(models.Model):
                 self.longitude = lng
         super().save(*args, **kwargs)
 
-
 class Wishlist(models.Model):
     customer = models.ForeignKey('customer_auth.CustomerUser', on_delete=models.CASCADE, related_name='wishlists')
     tour = models.ForeignKey('tours.Tour', on_delete=models.CASCADE, related_name='wishlisted_by')
@@ -194,9 +190,6 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.customer.email} - {self.tour.title}"
-
-
-
 
 class TourAnalytics(models.Model):
     EVENT_TYPES = [
@@ -218,3 +211,12 @@ class TourAnalytics(models.Model):
     def __str__(self):
         return f"{self.event_type} on {self.tour.title} at {self.timestamp}"
 
+class TourRating(models.Model):
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='ratings')
+    user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE)
+    rating = models.PositiveSmallIntegerField()  # from 1 to 5
+    review = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('tour', 'user')  # Optional: prevent duplicate ratings per user

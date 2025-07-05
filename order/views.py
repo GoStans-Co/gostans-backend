@@ -19,227 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import json
 from django.db.models import F
-
-
-class AddToCartAPIView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CustomerUserJWTAuthentication]
-    serializer_class = AddToCartSerializer
-    queryset = Cart.objects.all()
-
-    @swagger_auto_schema(
-        operation_description="Add a tour to the user's cart.",
-        manual_parameters=[
-            openapi.Parameter(
-                name='Authorization',
-                in_=openapi.IN_HEADER,
-                description='JWT token (Bearer <token>)',
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                name='tour_id',
-                in_=openapi.IN_PATH,
-                description='UUID of the tour to add to cart',
-                type=openapi.TYPE_STRING,
-                format='uuid',
-                required=True,
-            ),
-        ],
-        request_body=AddToCartSerializer,
-        responses={
-            201: openapi.Response(
-                description="Tour added to cart successfully",
-                schema=CartItemSerializer,
-                # examples...
-            ),
-            200: openapi.Response(
-                description="Tour already in cart, quantity updated",
-                schema=CartItemSerializer,
-                # examples...
-            ),
-            400: openapi.Response(description="Validation error"),
-            401: openapi.Response(description="Unauthorized"),
-        }
-    )
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        result = serializer.save()
-        cart_item = result['cart_item']
-        created = result['created']
-
-        output_serializer = CartItemSerializer(cart_item)
-
-        return custom_response(
-            status_code=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-            message="Tour successfully added to cart." if created else "Tour already in cart. Quantity updated.",
-            data=output_serializer.data
-        )
-
-
-class RemoveFromCartAPIView(generics.DestroyAPIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CustomerUserJWTAuthentication]
-    lookup_url_kwarg = 'tour_uuid'
-
-    @swagger_auto_schema(
-        operation_description="Remove a tour from the authenticated user's cart.",
-        manual_parameters=[
-            openapi.Parameter(
-                name='Authorization',
-                in_=openapi.IN_HEADER,
-                description='JWT token (Bearer <token>)',
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                name='tour_uuid',
-                in_=openapi.IN_PATH,
-                description='UUID of the tour to remove from cart',
-                type=openapi.TYPE_STRING,
-                format='uuid',
-                required=True,
-            )
-        ],
-        responses={
-            200: openapi.Response(
-                description="Removed from cart",
-                examples={
-                    "application/json": {
-                        "status": 200,
-                        "message": "Removed from cart",
-                        "data": {
-                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
-                            "message": "Removed from cart"
-                        }
-                    }
-                }
-            ),
-            404: openapi.Response(
-                description="Item not found in cart",
-                examples={
-                    "application/json": {
-                        "status": 404,
-                        "message": "Item not found in cart",
-                        "data": {
-                            "tour_uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a"
-                        }
-                    }
-                }
-            ),
-            401: openapi.Response(
-                description="Unauthorized",
-                examples={
-                    "application/json": {
-                        "detail": "Authentication credentials were not provided."
-                    }
-                }
-            )
-        }
-    )
-
-    def delete(self, request, tour_uuid):
-        customer = request.user
-        tour = get_object_or_404(Tour, uuid=tour_uuid)
-
-        cart_item = Cart.objects.filter(customer=customer, tour=tour).first()
-        if cart_item:
-            cart_item.delete()
-
-            serializer = RemovedCartItemSerializer({
-                "tour_uuid": tour.uuid,
-                "message": "Removed from cart"
-            })
-
-            return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="Removed from cart",
-                data=serializer.data
-            )
-
-        return custom_response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Item not found in cart",
-            data={"tour_uuid": tour.uuid}
-        )
-
-class CartListAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [CustomerUserJWTAuthentication]
-    serializer_class = CartItemSerializer  
-
-    @swagger_auto_schema(
-        operation_description="Retrieve all items from the authenticated user's cart.",
-        manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                description="JWT token (Bearer <token>)",
-                type=openapi.TYPE_STRING,
-                required=True
-            )
-        ],
-        responses={
-            200: openapi.Response(
-                description="Cart items retrieved or cart is empty",
-                examples={
-                    "application/json": {
-                        "status": 200,
-                        "message": "Cart items retrieved successfully",
-                        "data": [
-                            {
-                                "id": 1,
-                                "tour": {
-                                    "id": 12,
-                                    "title": "Jeju Island Tour",
-                                    "price": 150
-                                },
-                                "quantity": 2
-                            },
-                            {
-                                "id": 2,
-                                "tour": {
-                                    "id": 9,
-                                    "title": "Seoul Food Crawl",
-                                    "price": 80
-                                },
-                                "quantity": 1
-                            }
-                        ]
-                    }
-                }
-            ),
-            401: openapi.Response(
-                description="Unauthorized",
-                examples={
-                    "application/json": {
-                        "detail": "Authentication credentials were not provided."
-                    }
-                }
-            )
-        }
-    )
-
-    def list(self, request, *args, **kwargs):  
-        customer = request.user
-        cart_items = Cart.objects.filter(customer=customer).select_related('tour')
-
-        if not cart_items.exists():
-            return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="Your cart is empty",
-                data=[]
-            )
-
-        serializer = self.get_serializer(cart_items, many=True)
-        return custom_response(
-            status_code=status.HTTP_200_OK,
-            message="Cart items retrieved successfully",
-            data=serializer.data
-        )
-    
+from paypalrestsdk import Sale, Refund
 
 
 
@@ -249,6 +29,7 @@ class CreatePaymentView(APIView):
 
     @swagger_auto_schema(
         operation_description="Initiate a PayPal payment for a tour booking.",
+        tags=["User Controller"],
         manual_parameters=[
             openapi.Parameter(
                 name='Authorization',
@@ -347,7 +128,7 @@ class CreatePaymentView(APIView):
 
         if errors:
             return custom_response(
-                status_code=400,
+                statusCode=400,
                 message="Validation failed",
                 data=errors
             )
@@ -398,7 +179,7 @@ class CreatePaymentView(APIView):
                     if missing_fields:
                         print(f"Participant {idx+1} missing fields: {missing_fields}")
                         return custom_response(
-                            status_code=400,
+                            statusCode=400,
                             message=f"Participant {idx + 1} is missing fields: {', '.join(missing_fields)}",
                             data=p
                         )
@@ -415,7 +196,7 @@ class CreatePaymentView(APIView):
             for link in payment['links']:
                 if link['rel'] == 'approval_url':
                     return custom_response(
-                        status_code=200,
+                        statusCode=200,
                         message="Payment created successfully",
                         data={
                             "booking_id": booking.id,
@@ -425,7 +206,7 @@ class CreatePaymentView(APIView):
                     )
         else:
             return custom_response(
-                status_code=400,
+                statusCode=400,
                 message="Payment creation failed",
                 data=payment.error
             )
@@ -438,6 +219,7 @@ class ExecutePaymentView(APIView):
 
     @swagger_auto_schema(
         operation_description="Execute a PayPal payment after user approval.",
+        tags=["User Controller"],
         manual_parameters=[
             openapi.Parameter(
                 name='Authorization',
@@ -512,7 +294,7 @@ class ExecutePaymentView(APIView):
 
         if errors:
             return custom_response(
-                status_code=400,
+                statusCode=400,
                 message="Validation failed",
                 data=errors
             )
@@ -569,7 +351,7 @@ class ExecutePaymentView(APIView):
                 session_id=request.session.session_key
             )
             return custom_response(
-                status_code=200,
+                statusCode=200,
                 message="Payment completed successfully",
                 data=payment.to_dict()
             )
@@ -583,7 +365,7 @@ class ExecutePaymentView(APIView):
                 pass
 
             return custom_response(
-                status_code=400,
+                statusCode=400,
                 message="Payment execution failed",
                 data=payment.error
             )
@@ -597,12 +379,34 @@ class PayPalWebhookView(APIView):
     def dispatch(self, *args, **kwargs):
         return super(PayPalWebhookView, self).dispatch(*args, **kwargs)
 
+    @swagger_auto_schema(
+        operation_description="PayPal Webhook to handle payment updates (e.g., SALE.COMPLETED, REFUNDED).",
+        tags=["💳 Payment Webhooks"],
+        responses={
+            200: openapi.Response(
+                description="Webhook processed successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Booking status updated to Booked",
+                        "data": {
+                            "booking_id": 123,
+                            "status": "BOOKED"
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(description="Invalid request"),
+            404: openapi.Response(description="Booking or payment not found"),
+        }
+    )
+
     def post(self, request, *args, **kwargs):
         try:
             event_body = json.loads(request.body)
         except json.JSONDecodeError:
             return custom_response(
-                status_code=400,
+                statusCode=400,
                 message="Invalid JSON in request body",
                 data={}
             )
@@ -614,7 +418,7 @@ class PayPalWebhookView(APIView):
 
         if not payment_id:
             return custom_response(
-                status_code=400,
+                statusCode=400,
                 message="Payment ID not found in resource",
                 data={}
             )
@@ -623,7 +427,7 @@ class PayPalWebhookView(APIView):
             booking = TourBooking.objects.get(payment_id=payment_id)
         except TourBooking.DoesNotExist:
             return custom_response(
-                status_code=404,
+                statusCode=404,
                 message="Booking not found for payment_id",
                 data={"payment_id": payment_id}
             )
@@ -663,13 +467,134 @@ class PayPalWebhookView(APIView):
                 )
 
             return custom_response(
-                status_code=200,
+                statusCode=200,
                 message=f"Booking status updated to {status_map[event_type]}",
                 data={"booking_id": booking.id, "status": booking.status}
             )
 
         return custom_response(
-            status_code=200,
+            statusCode=200,
             message="Unhandled event type received",
             data={"event_type": event_type}
+        )
+
+
+class CancelBookingView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    @swagger_auto_schema(
+        operation_description="Cancel a tour booking and refund the payment via PayPal.",
+        tags=["User Controller"],
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                description='JWT Token in format: Bearer <token>',
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["booking_id"],
+            properties={
+                "booking_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the tour booking to cancel"),
+            },
+        ),
+        responses={
+            200: openapi.Response(description="Booking cancelled and refund processed"),
+            400: openapi.Response(description="Invalid request or cancellation failed"),
+            404: openapi.Response(description="Booking not found"),
+        }
+    )
+    def post(self, request):
+        booking_id = request.data.get("booking_id")
+        user = request.user
+
+        if not booking_id:
+            return custom_response(
+                statusCode=400,
+                message="booking_id is required",
+                data={}
+            )
+
+        try:
+            booking = TourBooking.objects.get(id=booking_id, customer=user)
+        except TourBooking.DoesNotExist:
+            return custom_response(
+                statusCode=404,
+                message="Booking not found for this user",
+                data={"booking_id": booking_id}
+            )
+
+        # Only allow cancellation if not already cancelled or completed
+
+        if booking.status in ["Cancelled", "Booked"]:
+            return custom_response(
+                statusCode=400,
+                message=f"Booking cannot be cancelled. Current status: {booking.status}",
+                data={}
+            )
+
+        try:
+            payment = Payment.objects.get(booking=booking)
+        except Payment.DoesNotExist:
+            return custom_response(
+                statusCode=404,
+                message="Payment record not found for this booking",
+                data={"booking_id": booking_id}
+            )
+
+        # Refund via PayPal only if payment was completed
+        if payment.status != "COMPLETED":
+            return custom_response(
+                statusCode=400,
+                message="Payment not completed, cannot refund",
+                data={}
+            )
+
+        # Execute PayPal refund
+        try:
+            # Get sale transaction id from payment record
+            sale_id = payment.paypal_txn_id
+            if not sale_id:
+                return custom_response(
+                    statusCode=400,
+                    message="No PayPal sale transaction ID found for refund",
+                    data={}
+                )
+
+            sale = Sale.find(sale_id)
+            refund = sale.refund({})
+
+            if not refund.success():
+                return custom_response(
+                    statusCode=400,
+                    message="PayPal refund failed",
+                    data=refund.error
+                )
+        except Exception as e:
+            return custom_response(
+                statusCode=400,
+                message=f"PayPal refund exception: {str(e)}",
+                data={}
+            )
+
+        # Update booking and payment status inside transaction
+        with transaction.atomic():
+            booking.status = "Cancelled"
+            booking.save()
+
+            payment.status = "Refunded"
+            payment.save()
+
+        return custom_response(
+            statusCode=200,
+            message="Booking cancelled and refund processed successfully",
+            data={
+                "booking_id": booking.id,
+                "payment_id": payment.payment_id,
+                "refund_id": refund.id
+            }
         )

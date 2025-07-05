@@ -1,25 +1,64 @@
-from django.http import JsonResponse
-from django.conf import settings
-from django.contrib import admin
-from django.urls import path, include,re_path
-from django.conf.urls.static import static
-from django.views.i18n import set_language
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from rest_framework import permissions  
+from rest_framework import permissions
+from django.urls import path, re_path, include
+from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
+from django.http import JsonResponse
 
+# 📘 Custom Swagger Description
+API_DESCRIPTION = """
+## 📘 GoStans API Overview
+
+
+Welcome to the GoStans API documentation. This documentation provides details on all API endpoints categorized by usage.
+
+### ✅ Public APIs
+No authentication required.
+
+### 👤 User APIs
+Require login via JWT Bearer token. Includes login, signup, profile, cart.
+
+### 🧳 Tour APIs
+Tour listings, filters, booking, and analytics.
+
+### 💳 Payment APIs
+Razorpay and PayPal integrations with webhooks.
+
+---
+
+### 🔐 Authentication Header
+
+All private APIs require this HTTP header:
+
+
+---
+
+### ⚠️ Status Codes
+
+| Code | Description             |
+|------|--------------------------|
+| ✅ 200 | OK (Success)           |
+| 🔴 400 | Bad request            |
+| 🔐 401 | Unauthorized           |
+| 🚫 403 | Forbidden              |
+| 🔍 404 | Not found              |
+| 💥 500 | Internal server error |
+
+> 🔒 In production, all 400/500 messages should be **generalized**
+"""
 
 schema_view = get_schema_view(
-   openapi.Info(
-      title="Tour API Docs",
-      default_version='v1',
-      description="API documentation for your Tour platform",
-      terms_of_service="https://www.example.com/terms/",
-      contact=openapi.Contact(email="support@example.com"),
-      license=openapi.License(name="BSD License"),
-   ),
-   public=True,
-   permission_classes=(permissions.AllowAny,),
+    openapi.Info(
+        title="GoStans API",
+        default_version='v1',
+        description=API_DESCRIPTION,
+        contact=openapi.Contact(email="support@gostans.com"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    permission_classes=(permissions.AllowAny,),
 )
 
 def health_check(request):
@@ -28,17 +67,16 @@ def health_check(request):
 urlpatterns = [
     path('health/', health_check),
     path('admin/', admin.site.urls),
-    path('api/auth/', include('customer_auth.urls')),  # API for normal users
-    path('set_language/', set_language, name='set_language'),
-    path('api/location/', include('location.urls')),
-    path('chaining/', include('smart_selects.urls')),
-    path('api/', include('tours.urls')),
-    path('api/cart/', include('order.urls')),
-    path('api/partner/', include('partners.urls')),
 
-     # Swagger URLs
+    # Include actual app APIs
+    # path('api/auth/', include('customer_auth.urls')),  # 👤 User auth
+    path('api/v1/auth/', include('customer_auth.urls.auth_urls')),   #  Auth endpoints
+    path('api/v1/user/', include('customer_auth.urls.users_urls')),  # Profile endpoints
+    path('api/', include('tours.urls')), 
+    path('api/v1/user/', include('partners.urls')),              
+
+    # Swagger and Redoc URLs
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Tour, TourTag, TourType,TourImage,Itinerary,TourPricing,Wishlist,ExcludedItem,IncludedItem
+from .models import Tour, TourTag, TourType,TourImage,Itinerary,TourPricing,Wishlist,ExcludedItem,IncludedItem,TourRating
 
 class TourTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,15 +49,13 @@ class IncludedItemSerializer(serializers.ModelSerializer):
         model = IncludedItem
         fields = ['text']
 
-
-
 class TourDetailSerializer(serializers.ModelSerializer):
     images = TourImageSerializer(many=True, read_only=True)
     itineraries = ItinerarySerializer(many=True, read_only=True)
-    age_pricing = TourPricingSerializer(many=True, read_only=True)
+    agepricing = TourPricingSerializer(many=True, read_only=True)
     tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='slug')
-    excluded=ExcludedItemSerializer(source='excluded_items',many=True, read_only=True)
-    IncludedItem=IncludedItemSerializer(source='excluded_items',many=True, read_only=True)
+    excludedItem = ExcludedItemSerializer(source='excluded_items',many=True, read_only=True)
+    includedItem = IncludedItemSerializer(source='included_items', many=True, read_only=True)
     tour_type = serializers.StringRelatedField()
     country = serializers.StringRelatedField()
     city = serializers.StringRelatedField()
@@ -68,7 +66,7 @@ class TourDetailSerializer(serializers.ModelSerializer):
             'id','uuid', 'title', 'short_description', 'tour_type', 'duration', 'about', 'price', 'currency',
             'trip_start_date', 'trip_end_date', 'country', 'city', 'group_size', 'language',
             'age_min', 'age_max', 'partner', 'tags', 'main_image', 'created_at',
-            'images', 'itineraries', 'age_pricing','excluded','IncludedItem'
+            'images', 'itineraries', 'agepricing','excludedItem','includedItem'
         ]        
 
 
@@ -97,3 +95,9 @@ class WishlistTourSerializer(serializers.ModelSerializer):
 class RemovedWishlistItemSerializer(serializers.Serializer):
     tour_uuid = serializers.UUIDField()
     message = serializers.CharField()
+
+
+class TourRatingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TourRating
+        fields = ['rating', 'review']

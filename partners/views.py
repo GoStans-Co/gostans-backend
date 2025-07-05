@@ -1,15 +1,16 @@
-
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from rest_framework import generics, status
 from rest_framework.response import Response
 from .serializers import PartnerRegistrationSerializer
 from common.utils import custom_response  # assuming you use this
 from rest_framework.views import APIView
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+
 
 class PartnerRegistrationAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Register a new partner account.",
+        tags=["Admin Controller"],
         request_body=PartnerRegistrationSerializer,
         responses={
             201: openapi.Response(
@@ -39,18 +40,19 @@ class PartnerRegistrationAPIView(APIView):
             )
         }
     )
+    
     def post(self, request):
         serializer = PartnerRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
             user.is_staff = True 
             return custom_response(
-                status_code=status.HTTP_201_CREATED,
+                statusCode=status.HTTP_201_CREATED,
                 message="Partner registered successfully.",
                 data={"username": user.username}
             )
         return custom_response(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            statusCode=status.HTTP_400_BAD_REQUEST,
             message="Validation failed",
             data=serializer.errors
         )
