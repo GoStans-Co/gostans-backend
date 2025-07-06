@@ -141,8 +141,8 @@ class CreatePaymentView(APIView):
             "intent": "sale",
             "payer": {"payment_method": "paypal"},
             "redirect_urls": {
-                "return_url": "https://localhost:5173/payment-success/return",
-                "cancel_url": "https://localhost:5173/payment-cancel/return"
+                "return_url": "http://localhost:5173/payment-success/return",
+                "cancel_url": "http://localhost:5173/payment-cancel/return"
             },
             "transactions": [{
                 "amount": {"total": f"{amount}", "currency": currency},
