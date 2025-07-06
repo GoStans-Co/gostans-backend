@@ -68,14 +68,10 @@ urlpatterns = [
     path('health/', health_check),
     path('admin/', admin.site.urls),
 
-    # Include actual app APIs
-    # path('api/auth/', include('customer_auth.urls')),  # 👤 User auth
-    path('api/v1/auth/', include('customer_auth.urls.auth_urls')),   #  Auth endpoints
-    path('api/v1/user/', include('customer_auth.urls.users_urls')),  # Profile endpoints
-    path('api/', include('tours.urls')), 
+    path('api/v1/auth/', include('customer_auth.urls.auth_urls')),   #  auth endpoints
+    path('api/v1/user/', include('customer_auth.urls.users_urls')),  # profile endpoints
     path('api/v1/user/', include('partners.urls')),              
-
-    # Swagger and Redoc URLs
+    path('api/v1/tours/', include('tours.urls')), 
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

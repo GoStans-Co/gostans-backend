@@ -3,7 +3,6 @@ from .views import TourListAPIView,TourDetailAPIView
 
 
 urlpatterns = [
-    path('tours/', TourListAPIView.as_view(), name='tour-list'),
-    path('tours/<uuid:tour_uuid>/', TourDetailAPIView.as_view(), name='tour-detail'),
-   
+    path('list/', TourListAPIView.as_view(), name='tour-list'),
+    path('detail/<uuid:tour_uuid>/', TourDetailAPIView.as_view(), name='tour-detail'), 
 ]

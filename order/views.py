@@ -41,28 +41,29 @@ class CreatePaymentView(APIView):
         ],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=["amount", "tour_uuid", "participants"],
+            required=["amount", "tourUuid", "participants"],
             properties={
                 "amount": openapi.Schema(type=openapi.TYPE_NUMBER, format="float", description="Total payment amount"),
                 "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g. USD, EUR)", default="USD"),
-                "tour_uuid": openapi.Schema(type=openapi.TYPE_STRING, format="uuid", description="UUID of the selected tour"),
+                "tourUuid": openapi.Schema(type=openapi.TYPE_STRING, format="uuid", description="UUID of the selected tour"),
                 "participants": openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     description="List of participants",
                     items=openapi.Items(
                         type=openapi.TYPE_OBJECT,
                         properties={
-                            "first_name": openapi.Schema(type=openapi.TYPE_STRING),
-                            "last_name": openapi.Schema(type=openapi.TYPE_STRING),
-                            "id_type": openapi.Schema(type=openapi.TYPE_STRING),
-                            "id_number": openapi.Schema(type=openapi.TYPE_STRING),
-                            "date_of_birth": openapi.Schema(type=openapi.TYPE_STRING, format="date")
+                            "firstName": openapi.Schema(type=openapi.TYPE_STRING),
+                            "lastName": openapi.Schema(type=openapi.TYPE_STRING),
+                            "idType": openapi.Schema(type=openapi.TYPE_STRING),
+                            "idNumber": openapi.Schema(type=openapi.TYPE_STRING),
+                            "dateOfBirth": openapi.Schema(type=openapi.TYPE_STRING, format="date")
                         },
-                        required=["first_name", "last_name", "id_type", "id_number", "date_of_birth"]
+                        required=["firstName", "lastName", "idType", "idNumber", "dateOfBirth"]
                     )
                 )
             }
         ),
+
         responses={
             200: openapi.Response(
                 description="Payment created successfully",
@@ -71,9 +72,9 @@ class CreatePaymentView(APIView):
                         "status": 200,
                         "message": "Payment created successfully",
                         "data": {
-                            "booking_id": 123,
-                            "approval_url": "https://paypal.com/approve",
-                            "payment_id": "PAY-987654321"
+                            "bookingId": 123,
+                            "approvalUrl": "https://paypal.com/approve",
+                            "paymentId": "PAY-987654321"
                         }
                     }
                 }
@@ -101,6 +102,7 @@ class CreatePaymentView(APIView):
         tour_uuid = request.data.get("tour_uuid")
         participants = request.data.get("participants", [])
 
+        print(request.data)
         errors = {}
         if amount is None:
             errors["amount"] = "Amount is required."
@@ -118,10 +120,12 @@ class CreatePaymentView(APIView):
         if currency and currency.upper() not in valid_currencies:
             errors["currency"] = f"Currency '{currency}' is not supported."
 
-        try:
+        print(f"Received tourUuid: {tour_uuid} (type: {type(tour_uuid)})")
+
+        try:        
             tour = Tour.objects.get(uuid=tour_uuid)
         except (Tour.DoesNotExist, ValueError):
-            errors["tour_uuid"] = "Tour not found or invalid UUID."
+            errors["tourUuid"] = "Tour not found or invalid UUID."
 
         if not participants:
             errors["participants"] = "At least one participant is required."
@@ -199,9 +203,9 @@ class CreatePaymentView(APIView):
                         statusCode=200,
                         message="Payment created successfully",
                         data={
-                            "booking_id": booking.id,
-                            "approval_url": link['href'],
-                            "payment_id": payment.id
+                            "bookingId": booking.id,
+                            "approvalUrl": link['href'],
+                            "paymentId": payment.id
                         }
                     )
         else:
