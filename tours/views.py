@@ -19,7 +19,7 @@ from django.db.models import F,Count,Avg
 
 
 class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 5
+    page_size = 20
     page_size_query_param = 'page_size'  # Allow client to change page size
     max_page_size = 20
 
@@ -231,7 +231,7 @@ class SubmitRatingView(APIView):
         request_body=TourRatingSerializer,
         tags=["User Controller"]
     )
-    
+
     def post(self, request, tour_uuid):
         try:
             tour = Tour.objects.get(uuid=tour_uuid)

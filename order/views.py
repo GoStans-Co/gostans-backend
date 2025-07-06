@@ -120,7 +120,7 @@ class CreatePaymentView(APIView):
         if currency and currency.upper() not in valid_currencies:
             errors["currency"] = f"Currency '{currency}' is not supported."
 
-        print(f"Received tourUuid: {tour_uuid} (type: {type(tour_uuid)})")
+        # print(f"Received tourUuid: {tour_uuid} (type: {type(tour_uuid)})")
 
         try:        
             tour = Tour.objects.get(uuid=tour_uuid)
@@ -141,8 +141,8 @@ class CreatePaymentView(APIView):
             "intent": "sale",
             "payer": {"payment_method": "paypal"},
             "redirect_urls": {
-                "return_url": "https://gostans.com/payment-success",
-                "cancel_url": "https://gostans.com/payment-cancel"
+                "return_url": "https://localhost:5173/payment-success/return",
+                "cancel_url": "https://localhost:5173/payment-cancel/return"
             },
             "transactions": [{
                 "amount": {"total": f"{amount}", "currency": currency},
