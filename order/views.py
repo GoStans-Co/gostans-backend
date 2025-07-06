@@ -102,7 +102,6 @@ class CreatePaymentView(APIView):
         tour_uuid = request.data.get("tour_uuid")
         participants = request.data.get("participants", [])
 
-        print(request.data)
         errors = {}
         if amount is None:
             errors["amount"] = "Amount is required."
@@ -120,7 +119,6 @@ class CreatePaymentView(APIView):
         if currency and currency.upper() not in valid_currencies:
             errors["currency"] = f"Currency '{currency}' is not supported."
 
-        # print(f"Received tourUuid: {tour_uuid} (type: {type(tour_uuid)})")
 
         try:        
             tour = Tour.objects.get(uuid=tour_uuid)
@@ -286,10 +284,10 @@ class ExecutePaymentView(APIView):
         }
     )
 
-    def post(self, request):
-        payment_id = request.data.get("paymentId")
-        payer_id = request.data.get("PayerID")
 
+    def post(self, request):
+        payment_id = request.data.get("payment_id")
+        payer_id = request.data.get("payer_id")
         errors = {}
         if not payment_id:
             errors["paymentId"] = "This field is required."
