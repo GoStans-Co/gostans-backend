@@ -313,19 +313,21 @@ class WishlistAddAPIView(APIView):
         customer = request.user  # Assumes user is authenticated
         tour = get_object_or_404(Tour, uuid=tour_uuid)
 
-        wishlist, created = Wishlist.objects.get_or_create(customer=customer, tour=tour)
+        wishlist_entry = Wishlist.objects.filter(customer=customer, tour=tour)
 
-        if created:
+        if wishlist_entry.exists():
+            wishlist_entry.delete()
             return custom_response(
-                statusCode=status.HTTP_201_CREATED,
-                message="Added to wishlist",
-                data={"tour_uuid": tour.uuid}
+                statusCode=200,
+                message="Removed from wishlist",
+                data={"tour_uuid": tour.uuid, "is_wishlisted": False}
             )
         else:
+            Wishlist.objects.create(customer=customer, tour=tour)
             return custom_response(
-                statusCode=status.HTTP_200_OK,
-                message="Already in wishlist",
-                data={"tour_uuid": tour.uuid}
+                statusCode=201,
+                message="Added to wishlist",
+                data={"tour_uuid": tour.uuid, "is_wishlisted": True}
             )
 
 
