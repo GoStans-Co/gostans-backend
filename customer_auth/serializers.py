@@ -10,10 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 import phonenumbers
 from order.models import SavedCard
 
-class SavedCardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SavedCard
-        fields = ["card_type", "last4", "expiry_month", "expiry_year", "is_default"]
+
 
 class CustomerLoginSerializer(serializers.Serializer):
     email_or_phone = serializers.CharField()
@@ -81,7 +78,6 @@ class CustomerUserSerializer(serializers.ModelSerializer):
 class CustomerUserProfileSerializer(serializers.ModelSerializer):
     wishlists = serializers.SerializerMethodField()
     is_verified = serializers.SerializerMethodField()
-    saved_cards = SavedCardSerializer(many=True, read_only=True)
     date_joined = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
     updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
 
