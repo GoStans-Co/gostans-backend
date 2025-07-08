@@ -5,17 +5,17 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from common.utils import custom_response,get_client_ip
-from .models import Tour,TourAnalytics,TourRating
+from .models import Tour,TourAnalytics,TourRating,Wishlist
 from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
 from rest_framework import status
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from customer_auth.authentication import CustomerUserJWTAuthentication
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
-from django.db.models import F,Count,Avg
+from django.db.models import F,Count,Avg,Exists,OuterRef,Value,BooleanField
+
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -54,10 +54,19 @@ class TourListAPIView(generics.ListAPIView):
     ]
 
     def get_queryset(self):
-        return Tour.objects.all() \
+        queryset = Tour.objects.all() \
             .order_by('-created_at') \
             .prefetch_related('tags') \
             .select_related('country', 'city', 'tour_type')
+
+        user = self.request.user
+        if user and user.is_authenticated:
+            wishlist_subquery = Wishlist.objects.filter(customer=user, tour=OuterRef('pk'))
+            queryset = queryset.annotate(is_liked=Exists(wishlist_subquery))
+        else:
+            queryset = queryset.annotate(is_liked=Value(False, output_field=BooleanField()))
+
+        return queryset
 
     @swagger_auto_schema(
         operation_description="Public.",
@@ -116,29 +125,21 @@ class TourListAPIView(generics.ListAPIView):
                     "results": serializer.data
                 }
             )
-
-        # Handle pagination
-        try:
-            page = self.paginate_queryset(queryset)
-        except NotFound:
-            return custom_response(
-                statusCode=404,
-                message="Invalid page number.",
-                data={}
-            )
-
+        
+        # Apply pagination
+        page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_data = self.get_paginated_response(serializer.data).data
-            # Inject `count` manually into paginated response
-            paginated_data['count'] = total_count
+            # Add count explicitly (optional; usually included)
+            paginated_data["count"] = total_count
             return custom_response(
                 statusCode=status.HTTP_200_OK,
                 message="Paginated tours retrieved successfully",
                 data=paginated_data
             )
 
-        # Fallback: no pagination
+        # No pagination fallback
         serializer = self.get_serializer(queryset, many=True)
         return custom_response(
             statusCode=status.HTTP_200_OK,
@@ -148,18 +149,29 @@ class TourListAPIView(generics.ListAPIView):
                 "results": serializer.data
             }
         )
-
-
+    
 class TourDetailAPIView(RetrieveAPIView):
     authentication_classes = [CustomerUserJWTAuthentication]
-
-    queryset = Tour.objects.all().prefetch_related(
-        'tags', 'images', 'itineraries', 'age_pricing'
-    ).select_related('country', 'city', 'tour_type')
     serializer_class = TourDetailSerializer
     lookup_field = 'uuid'  # default is 'pk', you can use 'id' if you prefer
     lookup_url_kwarg = 'tour_uuid'
 
+    # queryset = Tour.objects.all().prefetch_related(
+    #     'tags', 'images', 'itineraries', 'age_pricing'
+    # ).select_related('country', 'city', 'tour_type')
+    
+    def get_queryset(self):
+        base_queryset = Tour.objects.all().prefetch_related(
+            'tags', 'images', 'itineraries', 'age_pricing'
+        ).select_related('country', 'city', 'tour_type')
+
+        user = self.request.user
+        if user and user.is_authenticated:
+            liked_subquery = Wishlist.objects.filter(customer=user, tour=OuterRef('pk'))
+            return base_queryset.annotate(is_liked=Exists(liked_subquery))
+        else:
+            return base_queryset.annotate(is_liked=Value(False, output_field=BooleanField()))
+        
     @swagger_auto_schema(
         operation_description="Public.",
         tags=["Public APIs"],

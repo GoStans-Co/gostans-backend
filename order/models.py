@@ -89,3 +89,42 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment {self.payment_id} for Booking {self.booking.id}"
+
+
+class CardholderInfo(models.Model):
+    payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name="cardholder_info")
+    
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=20)
+
+    address1 = models.CharField(max_length=255)
+    locality = models.CharField(max_length=100)  # City
+    administrative_area = models.CharField(max_length=100)  # State
+    postal_code = models.CharField(max_length=20)
+    country = models.CharField(max_length=2)  # ISO country code like 'US', 'IN'
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} - {self.payment.payment_id}"
+
+
+class SavedCard(models.Model):
+    user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE, related_name="saved_cards")
+    customer_profile_id = models.CharField(max_length=255)  # from CyberSource
+    payment_token_id = models.CharField(max_length=255, unique=True)  # paymentInstrumentId
+    card_type = models.CharField(max_length=20)
+    last4 = models.CharField(max_length=4)
+    expiry_month = models.CharField(max_length=2)
+    expiry_year = models.CharField(max_length=4)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class FailedCardSaveLog(models.Model):
+    user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE)
+    booking = models.ForeignKey(TourBooking, on_delete=models.CASCADE)
+    card_data = models.JSONField()  # Mask sensitive info in prod!
+    error_message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)

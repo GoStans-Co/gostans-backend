@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from django.conf import settings
 import random
 from django.utils.timezone import now, timedelta
-from django.db.models import Count, Sum, Avg, Q, F
+from django.db.models import Count, Sum, Avg, Q, F,Case, When, IntegerField
 
 def custom_response(statusCode=200, message="Success", data=None):
     return Response({

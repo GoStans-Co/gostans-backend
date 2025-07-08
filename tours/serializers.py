@@ -14,11 +14,15 @@ class TourTypeSerializer(serializers.ModelSerializer):
 
 class TourListSerializer(serializers.ModelSerializer):
     tour_type = TourTypeSerializer(read_only=True)
-    
+    is_liked = serializers.SerializerMethodField()
+
     class Meta:
         model = Tour
-        fields = ['id','uuid', 'title', 'short_description', 'tour_type', 'price', 'currency', 'main_image']
+        fields = ['id','uuid', 'title', 'short_description', 'tour_type', 'price', 'currency', 'main_image','is_liked']
 
+    def get_is_liked(self, obj):
+        return getattr(obj, 'is_liked', False)
+    
 class TourImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = TourImage
@@ -59,6 +63,7 @@ class TourDetailSerializer(serializers.ModelSerializer):
     tour_type = serializers.StringRelatedField()
     country = serializers.StringRelatedField()
     city = serializers.StringRelatedField()
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Tour
@@ -66,8 +71,10 @@ class TourDetailSerializer(serializers.ModelSerializer):
             'id','uuid', 'title', 'short_description', 'tour_type', 'duration', 'about', 'price', 'currency',
             'trip_start_date', 'trip_end_date', 'country', 'city', 'group_size', 'language',
             'age_min', 'age_max', 'partner', 'tags', 'main_image', 'created_at',
-            'images', 'itineraries', 'agepricing','excludedItem','includedItem'
-        ]        
+            'images', 'itineraries', 'agepricing','excludedItem','includedItem','is_liked'
+        ] 
+    def get_is_liked(self, obj):
+        return getattr(obj, 'is_liked', False)       
 
 
 class WishlistAddSerializer(serializers.ModelSerializer):

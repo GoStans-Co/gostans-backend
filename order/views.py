@@ -1,15 +1,14 @@
 
 # cart/views.py
-
+import base64
+import requests
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from customer_auth.authentication import CustomerUserJWTAuthentication
 from common.utils import custom_response,get_client_ip
 from tours.models import Tour,TourAnalytics
-from .models import Cart,TourBooking,BookingParticipant,Payment
-from tours.serializers import TourListSerializer  
-from .serializers import CartItemSerializer,AddToCartSerializer,RemovedCartItemSerializer
+from .models import TourBooking,BookingParticipant,Payment,SavedCard,FailedCardSaveLog
 from .paypal_client import paypalrestsdk
 from rest_framework.views import APIView
 from django.db import transaction
@@ -20,6 +19,9 @@ from django.utils.decorators import method_decorator
 import json
 from django.db.models import F
 from paypalrestsdk import Sale, Refund
+from django.conf import settings
+from .payment_gateway import process_cybersource_payment, save_card_profile
+
 
 
 
@@ -288,7 +290,9 @@ class ExecutePaymentView(APIView):
     def post(self, request):
         payment_id = request.data.get("payment_id")
         payer_id = request.data.get("payer_id")
-        errors = {}
+        print(f"Received paymentId : {request.data} ")
+
+        errors = {} 
         if not payment_id:
             errors["paymentId"] = "This field is required."
         if not payer_id:
@@ -598,5 +602,179 @@ class CancelBookingView(APIView):
                 "booking_id": booking.id,
                 "payment_id": payment.payment_id,
                 "refund_id": refund.id
+            }
+        )
+
+
+#visa paymement 
+class CardBookingView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    @swagger_auto_schema(
+    operation_description="Book a tour using credit/debit card (CyberSource)",
+        tags=["User Controller"]
+    )
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+
+        amount = data.get("amount")
+        currency = data.get("currency", "USD")
+        participants = data.get("participants", [])
+        tour_uuid = data.get("tour_uuid")
+        card_info = data.get("card_info")
+        billing_info = data.get("billing_info")
+
+        errors = {}
+
+        #  Amount validation
+        if amount is None:
+            errors["amount"] = "Amount is required."
+        else:
+            try:
+                amount_val = float(amount)
+                if amount_val <= 0:
+                    errors["amount"] = "Amount must be greater than zero."
+                if round(amount_val, 2) != amount_val:
+                    errors["amount"] = "Amount can have up to 2 decimal places."
+            except ValueError:
+                errors["amount"] = "Amount must be a valid number."
+
+        # Currency validation
+        valid_currencies = {"USD", "EUR", "GBP", "INR", "JPY", "UZS", "RUB"}
+        if currency and currency.upper() not in valid_currencies:
+            errors["currency"] = f"Currency '{currency}' is not supported."
+
+        # Tour validation
+        try:
+            tour = Tour.objects.get(uuid=tour_uuid)
+        except (Tour.DoesNotExist, ValueError):
+            errors["tourUuid"] = "Tour not found or invalid UUID."
+
+        #  Participant validation
+        if not participants:
+            errors["participants"] = "At least one participant is required."
+        else:
+            for idx, p in enumerate(participants):
+                missing = [k for k in ("first_name", "last_name", "id_type", "id_number", "date_of_birth") if not p.get(k)]
+                if missing:
+                    errors[f"participant_{idx+1}"] = f"Missing: {', '.join(missing)}"
+
+        if errors:
+            return custom_response(
+                statusCode=400,
+                message="Validation failed",
+                data=errors
+            )
+
+        #  Step 1: Charge Card Immediately (no card saving yet)
+        payment_response = process_cybersource_payment(
+            amount=amount_val,
+            currency=currency.upper(),
+            card=card_info,
+            billing=billing_info
+        )
+
+        if payment_response.get("status") != "COMPLETED":
+            return custom_response(
+                statusCode=402,
+                message="Payment failed",
+                data=payment_response
+            )
+
+        #  Step 2: Save booking/payment/participants/analytics in DB
+        with transaction.atomic():
+            # Booking
+            booking = TourBooking.objects.create(
+                customer=user,
+                partner=tour.partner,
+                tour=tour,
+                payment_id=payment_response['payment_id'],
+                amount=amount_val,
+                currency=currency.upper(),
+                status="COMPLETED",  # Because payment succeeded
+                trip_start_date=tour.trip_start_date,
+                trip_end_date=tour.trip_end_date,
+                country=tour.country,
+                city=tour.city
+            )
+
+            # Payment record
+            payment = Payment.objects.create(
+                booking=booking,
+                payment_id=payment_response['payment_id'],
+                amount=amount_val,
+                currency=currency.upper(),
+                status=payment_response['status'],
+                payment_method="card",
+                details=payment_response
+            )
+
+            # Participants
+            for p in participants:
+                BookingParticipant.objects.create(
+                    booking=booking,
+                    first_name=p["first_name"],
+                    last_name=p["last_name"],
+                    id_type=p["id_type"],
+                    id_number=p["id_number"],
+                    date_of_birth=p["date_of_birth"]
+                )
+
+            # Booking count update (atomic)
+            Tour.objects.filter(pk=tour.pk).update(booking_count=F('booking_count') + 1)
+
+            # Booking analytics
+            TourAnalytics.objects.create(
+                tour=tour,
+                event_type='booking',
+                user=user,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                session_id=request.session.session_key
+            )
+
+            # Savind PCI compiance card detail only after successful payment
+            if data.get("save_card", False):
+                card_profile = save_card_profile(user, card_info, billing_info)
+
+                if "error" not in card_profile:
+                    SavedCard.objects.create(
+                        user=user,
+                        customer_profile_id=card_profile['profile_id'],
+                        payment_token_id=card_profile['token_id'],
+                        card_type=card_profile['card_type'],
+                        last4=card_profile['last4'],
+                        expiry_month=card_profile['exp_month'],
+                        expiry_year=card_profile['exp_year'],
+                        is_default=not SavedCard.objects.filter(user=user).exists()
+                    )
+                else:
+                    masked_card_info = {
+                        "type": card_info.get("type", "unknown"),
+                        "last4": card_info.get("number", "")[-4:] if "number" in card_info else None,
+                        "bin": card_info.get("number", "")[:6] if "number" in card_info else None,
+                        "exp_month": card_info.get("exp_month"),
+                        "exp_year": card_info.get("exp_year")
+                    }
+                    # Temporary DB fallback to log card save issues
+                    FailedCardSaveLog.objects.create(
+                        user=user,
+                        booking=booking,
+                        card_data=masked_card_info,
+                        error_message=card_profile["error"]
+                    )
+        # final response
+        return custom_response(
+            statusCode=200,
+            message="Payment completed successfully",
+            data={
+                "booking_id": booking.id,
+                "payment_id": payment.payment_id,
+                "amount": payment.amount,
+                "currency": payment.currency,
+                "status": payment.status
             }
         )

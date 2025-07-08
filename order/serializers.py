@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cart
+from .models import Cart,Payment,CardholderInfo,SavedCard
 from tours.models import Tour
 from .models import TourBooking, BookingParticipant
 from tours.models import Tour
@@ -84,3 +84,19 @@ class TourBookingCreateSerializer(serializers.ModelSerializer):
             BookingParticipant.objects.create(booking=booking, **participant)
 
         return booking
+    
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
+class CardholderInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CardholderInfo
+        fields = '__all__'
+
+class SavedCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SavedCard
+        fields = '__all__'

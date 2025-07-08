@@ -40,6 +40,22 @@ PAYPAL_MODE =config('PAYPAL_MODE',default='sandbox')
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID")
 PAYPAL_CLIENT_SECRET = config("PAYPAL_CLIENT_SECRET")
 
+
+#visa payment 
+CYBERSOURCE_MERCHANT_ID = config('CYBERSOURCE_MERCHANT_ID')
+CYBERSOURCE_API_KEY_ID = config('CYBERSOURCE_API_KEY_ID')
+CYBERSOURCE_SECRET_KEY = config('CYBERSOURCE_SECRET_KEY')
+CYBERSOURCE_HOST = config('CYBERSOURCE_HOST')
+CYBERSOURCE_API_BASE = "https://apitest.cybersource.com"
+
+CYBERSOURCE = {
+    "MERCHANT_ID": config('CYBERSOURCE_MERCHANT_ID'),
+    "API_KEY_ID": config('CYBERSOURCE_API_KEY_ID'),
+    "SECRET_KEY": config('CYBERSOURCE_SECRET_KEY'),
+    "ENVIRONMENT": "sandbox",  # or "production"
+}
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -114,6 +130,10 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+}
+
+JSON_UNDERSCOREIZE = {
+    'no_underscore_before_number': True
 }
 
 
