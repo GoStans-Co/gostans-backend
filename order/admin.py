@@ -19,17 +19,18 @@ class TourBookingAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "trip_start_date", "created_at", "country", "city", "partner")
     search_fields = ("customer__email", "tour__title", "payment_id")
-    list_editable = ("status",)
+    # list_editable = ("status",)
     inlines = [BookingParticipantInline]
 
     readonly_fields = (
         "customer_info", "tour_info", "partner_info", "payment_id", "amount", "currency",
-        "trip_start_date", "trip_end_date", "country", "city", "created_at", "updated_at"
+        "payment_status", "payment_method", "payment_made_at",
+        "trip_start_date", "trip_end_date", "country", "city", "created_at", "updated_at","status",
     )
 
     fieldsets = (
         ("Basic Info", {"fields": ("customer_info", "tour_info", "partner_info", "status")}),
-        ("Payment Info", {"fields": ("payment_id", "amount", "currency")}),
+        ("Payment Info", {"fields": ("payment_id", "amount", "currency","payment_status","payment_method","payment_made_at")}),
         ("Trip Info", {"fields": ("trip_start_date", "trip_end_date", "country", "city")}),
         ("Meta", {"fields": ("created_at", "updated_at")}),
     )
@@ -93,6 +94,21 @@ class TourBookingAdmin(admin.ModelAdmin):
             <strong>Itinerary:</strong><br>{itinerary_preview}
         """)
     tour_info.short_description = "Tour Info"
+
+    def payment_status(self, obj):
+        latest = obj.payments.order_by('-created_at').first()
+        return latest.status if latest else "N/A"
+    payment_status.short_description = "Payment Status"
+
+    def payment_method(self, obj):
+        latest = obj.payments.order_by('-created_at').first()
+        return latest.payment_method if latest else "N/A"
+    payment_method.short_description = "Payment Method"
+
+    def payment_made_at(self, obj):
+        latest = obj.payments.order_by('-created_at').first()
+        return latest.created_at.strftime("%Y-%m-%d %H:%M") if latest else "N/A"
+    payment_made_at.short_description = "Payment Made At"
 
     def has_add_permission(self, request):
         return False
