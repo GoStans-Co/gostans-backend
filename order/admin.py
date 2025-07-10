@@ -15,7 +15,7 @@ class BookingParticipantInline(admin.TabularInline):
 @admin.register(TourBooking)
 class TourBookingAdmin(admin.ModelAdmin):
     list_display = (
-        "id", "customer", "tour", "partner", "booking_status", "colored_payment_status", "trip_start_date", "created_at"
+        "id", "customer", "tour", "partner", "booking_status_badge", "payment_status_badge", "trip_start_date", "created_at"
     )
     list_filter = ("status", "trip_start_date", "created_at", "country", "city", "partner")
     search_fields = ("customer__email", "tour__title", "payment_id")
@@ -92,17 +92,39 @@ class TourBookingAdmin(admin.ModelAdmin):
         return latest.status if latest else "N/A"
     payment_status.short_description = "Payment Status"
 
-    def colored_payment_status(self, obj):
+    def payment_status_badge(self, obj):
         status = self.payment_status(obj).upper()
         color = {
-            "COMPLETED": "green",
-            "PENDING": "orange",
-            "DENIED": "red",
-            "REFUNDED": "blue",
-            "REVERSED": "purple"
-        }.get(status, "black")
-        return format_html('<b style="color:{};">{}</b>', color, status)
-    colored_payment_status.short_description = "Payment Status"
+            "COMPLETED": "#28a745",  # Green
+            "PENDING": "#ffc107",    # Orange
+            "DENIED": "#dc3545",     # Red
+            "REFUNDED": "#17a2b8",   # Blue
+            "REVERSED": "#6f42c1"    # Purple
+        }.get(status, "#6c757d")     # Default: gray
+
+        return format_html(
+            '<span style="padding:4px 8px; background-color:{}; color:white; border-radius:10px;">{}</span>',
+            color,
+            status.title()
+        )
+    payment_status_badge.short_description = "Payment Status"
+
+
+    def booking_status_badge(self, obj):
+        status = obj.status.upper()
+        color = {
+            "WAITING": "#ffc107",     # Yellow
+            "COMPLETED": "#28a745",   # Green
+            "FAILED": "#dc3545",      # Red
+            "REFUNDED": "#17a2b8",    # Blue
+        }.get(status, "#6c757d")      # Default: gray
+
+        return format_html(
+            '<span style="padding:4px 8px; background-color:{}; color:white; border-radius:10px;">{}</span>',
+            color,
+            status.title()
+        )
+    booking_status_badge.short_description = "Booking Status"
 
     def booking_status(self, obj):
         return obj.status
