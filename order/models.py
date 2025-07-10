@@ -20,10 +20,14 @@ class Cart(models.Model):
 
 class TourBooking(models.Model):
     STATUS_CHOICES = [
-        ("Waiting", "waiting"),
+        ("Pending", "pending"),
         ("COMPLETED", "Completed"),
         ("FAILED", "Failed"),
-        ("REFUNDED", "Refunded"),
+        ("REFUNDED", "Refunded"), # Post-booking refund
+        ("PAYMENT_DENIED", "Payment Denied"),    # PayPal denied
+        ("PAYMENT_FAILED", "Payment Failed"),    # PayPal error (e.g., invalid card)
+        ("CANCELLED", "Cancelled"),              # User cancelled during payment                   
+        ("REVERSED", "Reversed"), 
     ]
 
     id = models.AutoField(primary_key=True)
@@ -38,7 +42,11 @@ class TourBooking(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=10)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default="PENDING"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

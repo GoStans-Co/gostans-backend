@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from customer_auth.authentication import CustomerUserJWTAuthentication
 from common.utils import custom_response,get_client_ip
 from tours.models import Tour,TourAnalytics
+from rest_framework.permissions import AllowAny
 from .models import TourBooking,BookingParticipant,Payment,SavedCard,FailedCardSaveLog
 from .paypal_client import paypalrestsdk
 from rest_framework.views import APIView
@@ -443,25 +444,33 @@ class PayPalWebhookView(APIView):
         except Payment.DoesNotExist:
             return custom_response(404, "Payment record not found", {"payment_id": payment_id})
 
-        # Handle webhook event types
-        status_map = {
-            "PAYMENT.SALE.COMPLETED": "Booked",
-            "PAYMENT.SALE.DENIED": "Denied",
-            "PAYMENT.SALE.REFUNDED": "Refunded",
-            "PAYMENT.SALE.REVERSED": "Reversed"
+        # Map PayPal events to statuses for payment and booking separately
+        payment_status_map = {
+            "PAYMENT.SALE.COMPLETED": "COMPLETED",
+            "PAYMENT.SALE.DENIED": "DENIED",
+            "PAYMENT.SALE.REFUNDED": "REFUNDED",
+            "PAYMENT.SALE.REVERSED": "REVERSED",
         }
 
-        # handeling even in webhook
-        if event_type in status_map:
-            new_status = status_map[event_type]
-            payment_record.status = new_status
+        booking_status_map = {
+            "PAYMENT.SALE.COMPLETED": "BOOKED",
+            "PAYMENT.SALE.DENIED": "PAYMENT_DENIED",  
+            "PAYMENT.SALE.REFUNDED": "REFUNDED",
+            "PAYMENT.SALE.REVERSED": "REVERSED",
+        }
+
+        if event_type in payment_status_map:
+            # Update Payment status
+            payment_record.status = payment_status_map[event_type]
             payment_record.save()
 
-            booking =payment_record.booking
-            if new_status == "COMPLETED":
-                booking.status = "BOOKED" #tour booking done with payment
-                booking.save()
-                # If booking is now confirmed, increment booking count & log analytics
+            # Update Booking status accordingly
+            new_booking_status = booking_status_map.get(event_type, booking.status)
+            booking.status = new_booking_status
+            booking.save()
+
+            # If booking is confirmed, update count and analytics
+            if new_booking_status == "BOOKED":
                 Tour.objects.filter(pk=booking.tour.pk).update(booking_count=F('booking_count') + 1)
                 TourAnalytics.objects.create(
                     tour=booking.tour,
@@ -474,8 +483,8 @@ class PayPalWebhookView(APIView):
 
             return custom_response(
                 statusCode=200,
-                message=f"Booking status updated to {status_map[event_type]}",
-                data={"booking_id": booking.id, "status": booking.status}
+                message=f"Payment and Booking status updated to {payment_record.status} / {booking.status}",
+                data={"booking_id": booking.id, "payment_status": payment_record.status, "booking_status": booking.status}
             )
 
         return custom_response(
@@ -514,6 +523,7 @@ class CancelBookingView(APIView):
             404: openapi.Response(description="Booking not found"),
         }
     )
+    
     def post(self, request):
         booking_id = request.data.get("booking_id")
         user = request.user
@@ -664,7 +674,7 @@ class CardBookingView(APIView):
 
         if errors:
             return custom_response(
-                statusCode=400,
+                statusCode=status.HTTP_404_NOT_FOUND,
                 message="Validation failed",
                 data=errors
             )
@@ -768,7 +778,7 @@ class CardBookingView(APIView):
                     )
         # final response
         return custom_response(
-            statusCode=200,
+            statusCode=status.HTTP_200_OK,
             message="Payment completed successfully",
             data={
                 "booking_id": booking.id,
@@ -778,3 +788,46 @@ class CardBookingView(APIView):
                 "status": payment.status
             }
         )
+
+
+class PaymentStatusView(APIView):
+    permission_classes = [AllowAny]  # Allow frontend to access without auth (optional)
+
+    def get(self, request):
+        booking_id = request.query_params.get("booking_id")
+        if not booking_id:
+            return custom_response({
+                "statusCode": 400,
+                "message": "Booking ID is required.",
+                "data": {}
+            })
+
+        try:
+            booking = TourBooking.objects.get(id=booking_id)
+        except TourBooking.DoesNotExist:
+            return custom_response({
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "message": "Booking not found.",
+                "data": {}
+            })
+
+        try:
+            payment = Payment.objects.get(booking=booking)
+        except Payment.DoesNotExist:
+            return custom_response({
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "message": "Payment record not found.",
+                "data": {}
+            })
+
+        return custom_response({
+            "statusCode": status.HTTP_200_OK,
+            "message": "Booking payment status fetched.",
+            "data": {
+                "booking_status": booking.status,
+                "payment_status": payment.status,
+                "payment_id": payment.payment_id,
+                "amount": payment.amount,
+                "currency": payment.currency
+            }
+        })
