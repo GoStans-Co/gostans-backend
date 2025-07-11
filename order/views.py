@@ -703,7 +703,7 @@ class CardBookingView(APIView):
             return custom_response(
                 statusCode=500,
                 message="Payment service error",
-                data={"error"}
+                data=payment_response
             )
            
         print("Starting DB transaction to save booking and payment")
