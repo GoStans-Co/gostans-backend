@@ -679,6 +679,7 @@ class CardBookingView(APIView):
                 data=errors
             )
 
+        print("Payment response from CyberSource:", payment_response)
         #  Step 1: Charge Card Immediately (no card saving yet)
         payment_response = process_cybersource_payment(
             amount=amount_val,
@@ -693,6 +694,7 @@ class CardBookingView(APIView):
                 message="Payment failed",
                 data=payment_response
             )
+        print("Starting DB transaction to save booking and payment")
 
         #  Step 2: Save booking/payment/participants/analytics in DB
         with transaction.atomic():
