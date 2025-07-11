@@ -627,9 +627,10 @@ class CardBookingView(APIView):
     )
 
     def post(self, request):
+        print("🔔 Received booking request via card")
         user = request.user
         data = request.data
-
+        print("📦 Incoming Data:", data)
         amount = data.get("amount")
         currency = data.get("currency", "USD")
         participants = data.get("participants", [])
@@ -696,15 +697,24 @@ class CardBookingView(APIView):
                 message="Payment service error",
                 data={"error": str(e)}
             )
+        response = requests.post(url, data=json_payload, headers=headers)
+        print("🔁 Raw response from CyberSource:", response.status_code, response.text)
 
+        try:
+            result = response.json()
+        except Exception:
+            return {"status": "FAILED", "error": "Invalid response from CyberSource"}
+        
         if payment_response.get("status") != "COMPLETED":
+            print("❌ Payment not completed. Response:", payment_response)
             return custom_response(
-                statusCode=402,
-                message="Payment failed",
-                data=payment_response
+                statusCode=500,
+                message="Payment service error",
+                data={"error": str(e)}
             )
+           
         print("Starting DB transaction to save booking and payment")
-
+        print("💾 Creating booking and saving to DB")
         #  Step 2: Save booking/payment/participants/analytics in DB
         with transaction.atomic():
             # Booking

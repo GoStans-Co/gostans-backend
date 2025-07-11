@@ -52,6 +52,8 @@ def generate_http_signature(resource, method, payload):
     }
 
 def process_cybersource_payment(amount, currency, card, billing):
+    
+    
     resource = "/pts/v2/payments"
     url = CYBERSOURCE_API_BASE + resource
     print("Inside CyberSource payment")
@@ -100,11 +102,13 @@ def process_cybersource_payment(amount, currency, card, billing):
     }
 
     response = requests.post(url, data=json_payload, headers=headers)
-
+    print("🔁 Raw response from CyberSource:", response.status_code, response.text)
+    
     try:
         result = response.json()
     except Exception:
         return {"status": "FAILED", "error": "Invalid response from CyberSource"}
+    
 
     if response.status_code == 201 and result.get("status") == "AUTHORIZED":
         return {
