@@ -679,7 +679,7 @@ class CardBookingView(APIView):
                 data=errors
             )
 
-        print("Payment response from CyberSource:", payment_response)
+        print("Payment response from CyberSource:")
         #  Step 1: Charge Card Immediately (no card saving yet)
         try:
             payment_response = process_cybersource_payment(
