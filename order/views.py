@@ -681,12 +681,21 @@ class CardBookingView(APIView):
 
         print("Payment response from CyberSource:", payment_response)
         #  Step 1: Charge Card Immediately (no card saving yet)
-        payment_response = process_cybersource_payment(
-            amount=amount_val,
-            currency=currency.upper(),
-            card=card_info,
-            billing=billing_info
-        )
+        try:
+            payment_response = process_cybersource_payment(
+                amount=amount_val,
+                currency=currency.upper(),
+                card=card_info,
+                billing=billing_info
+            )
+            print("Payment response from CyberSource:", payment_response)
+        except Exception as e:
+            print("Exception occurred while processing payment:", str(e))
+            return custom_response(
+                statusCode=500,
+                message="Payment service error",
+                data={"error": str(e)}
+            )
 
         if payment_response.get("status") != "COMPLETED":
             return custom_response(
