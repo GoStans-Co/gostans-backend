@@ -54,7 +54,8 @@ def generate_http_signature(resource, method, payload):
 def process_cybersource_payment(amount, currency, card, billing):
     resource = "/pts/v2/payments"
     url = CYBERSOURCE_API_BASE + resource
-
+    print("Inside CyberSource payment")
+    print("Billing Info:", billing)
     payload = {
         "clientReferenceInformation": {
             "code": f"tour-booking-{uuid.uuid4().hex[:8]}"
@@ -75,7 +76,7 @@ def process_cybersource_payment(amount, currency, card, billing):
             "billTo": {
                 "firstName": billing["first_name"],
                 "lastName": billing["last_name"],
-                "address1": billing["address1"],
+                "address1": billing.get("address1") or billing.get("address_1"),
                 "locality": billing["locality"],
                 "administrativeArea": billing["administrative_area"],
                 "postalCode": billing["postal_code"],
