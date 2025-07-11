@@ -697,14 +697,7 @@ class CardBookingView(APIView):
                 message="Payment service error",
                 data={"error": str(e)}
             )
-        response = requests.post(url, data=json_payload, headers=headers)
-        print("🔁 Raw response from CyberSource:", response.status_code, response.text)
 
-        try:
-            result = response.json()
-        except Exception:
-            return {"status": "FAILED", "error": "Invalid response from CyberSource"}
-        
         if payment_response.get("status") != "COMPLETED":
             print("❌ Payment not completed. Response:", payment_response)
             return custom_response(
