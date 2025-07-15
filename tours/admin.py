@@ -1,10 +1,11 @@
 from django.contrib import admin
 from multiselectfield import MultiSelectField 
 from django.utils.html import format_html
-from .models import Tour, TourType, TourImage, IncludedItem, ExcludedItem, Itinerary ,TourTag,TourPricing
+from .models import Tour, TourType, TourImage, IncludedItem, ExcludedItem, Itinerary ,TourTag,TourPricing,TourAnalytics
 from django import forms
 from partners.models import PartnerProfile
 from django.core.exceptions import ValidationError
+
 
 
 class TourImageInline(admin.TabularInline):
@@ -146,3 +147,10 @@ class TourTagAdmin(admin.ModelAdmin):
 class TourTypeAdmin(admin.ModelAdmin):
     list_display = ('name',)
 
+
+@admin.register(TourAnalytics)
+class TourAnalyticsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'tour', 'event_type', 'user', 'timestamp']
+    list_filter = ['event_type', 'timestamp']
+    search_fields = ['tour__title', 'user__email', 'session_id', 'ip_address']
+    readonly_fields = ['timestamp']
