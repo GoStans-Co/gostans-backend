@@ -11,9 +11,9 @@ from rest_framework import status
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from django.utils.crypto import get_random_string
-from common.utils import custom_response,generate_otp
+from common.utils import custom_response,generate_otp,get_client_ip
 from django.shortcuts import get_object_or_404
-from tours.models import Wishlist,Tour
+from tours.models import Wishlist,Tour,TourAnalytics
 from tours.serializers import WishlistTourSerializer,RemovedWishlistItemSerializer
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import NotFound
@@ -324,6 +324,14 @@ class WishlistAddAPIView(APIView):
             )
         else:
             Wishlist.objects.create(customer=customer, tour=tour)
+            TourAnalytics.objects.create(
+                tour=tour,
+                event_type='wishlist_add',
+                user=request.user if request.user.is_authenticated else None,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                session_id=request.session.session_key
+            )
             return custom_response(
                 statusCode=201,
                 message="Added to wishlist",
