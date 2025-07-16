@@ -2,7 +2,7 @@ from rest_framework import status,generics,permissions,parsers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import CustomerUser,CustomerOTP
-from ..serializers import CustomerUserSerializer,CustomerUserProfileSerializer,CustomerLoginSerializer,CustomTokenRefreshSerializer,GoogleSerializer,CustomerSocialSerializer,SendOTPSerializer,VerifyOTPSerializer
+from ..serializers import CustomerUserSerializer,CustomerLoginSerializer,CustomTokenRefreshSerializer,GoogleSerializer,CustomerSocialSerializer,SendOTPSerializer,VerifyOTPSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from customer_auth.authentication import CustomerUserJWTAuthentication
@@ -20,7 +20,7 @@ from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
+import time
 
 User = CustomerUser  # Use this instead of get_user_model()
 

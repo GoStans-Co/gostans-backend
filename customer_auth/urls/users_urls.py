@@ -9,7 +9,7 @@ from customer_auth.views.user_views import (
     AddToCartAPIView,RemoveFromCartAPIView,CartListAPIView
 )
 
-from order.views import(CreatePaymentView,ExecutePaymentView,PayPalWebhookView,CancelBookingView,CardBookingView)
+from order.views import(CreatePaymentView,ExecutePaymentView,PayPalWebhookView,CancelBookingView,CardBookingView,PaymentStatusView)
 from tours.views import(SubmitRatingView)
 
 urlpatterns = [
@@ -28,4 +28,6 @@ urlpatterns = [
     path('cancelTour/', CancelBookingView.as_view(), name='Cancel-tour'),
     path("ratetour/<uuid:tour_uuid>/rate/", SubmitRatingView.as_view(), name="submit-tour-rating"),
     path("payments/card/", CardBookingView.as_view(), name="card-booking"),
+    path('payment-status/', PaymentStatusView.as_view(), name='payment-status'),
+
 ]

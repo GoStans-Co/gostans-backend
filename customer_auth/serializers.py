@@ -141,3 +141,14 @@ class VerifyOTPSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=4)
 
 
+class TelegramAuthSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField(required=False, allow_blank=True)
+    username = serializers.CharField(required=False, allow_blank=True)
+    photo_url = serializers.URLField(required=False)
+    auth_date = serializers.IntegerField()
+    hash = serializers.CharField()
+
+class FacebookAuthSerializer(serializers.Serializer):
+    access_token = serializers.CharField()

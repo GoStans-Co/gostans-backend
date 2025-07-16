@@ -74,6 +74,7 @@ urlpatterns = [
     path('api/v1/user/', include('customer_auth.urls.users_urls')),  # profile endpoints
     path('api/v1/user/', include('partners.urls')),              
     path('api/v1/tours/',include('tours.urls')),
+    path('api/v1/auth/',include('customer_auth.urls.social_urls')),
 
    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

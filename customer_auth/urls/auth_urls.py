@@ -6,6 +6,7 @@ from customer_auth.views import (
     GoogleSignupAPIView,
     SendOTPView,
     VerifyOTPView,
+    
 )
 
 urlpatterns = [
@@ -15,4 +16,5 @@ urlpatterns = [
     path('google/', GoogleSignupAPIView.as_view(), name='google-signup'),
     path('send-otp/', SendOTPView.as_view(), name='send-otp'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
+   
 ]
