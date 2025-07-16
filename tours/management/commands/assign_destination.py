@@ -13,3 +13,4 @@ class Command(BaseCommand):
             count += 1
 
         self.stdout.write(self.style.SUCCESS(f" Assigned destinations to {count} existing tours."))
+        
