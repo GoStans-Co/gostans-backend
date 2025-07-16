@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import Tour, TourTag, TourType,TourImage,Itinerary,TourPricing,Wishlist,ExcludedItem,IncludedItem,TourRating
-
+from .models import Tour, TourTag, TourType,TourImage,Itinerary,TourPricing,Wishlist,ExcludedItem,IncludedItem,TourRating,Destination
+from location.models import Country,City
 class TourTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = TourTag
@@ -108,3 +108,39 @@ class TourRatingSerializer(serializers.ModelSerializer):
     class Meta:
         model = TourRating
         fields = ['rating', 'review']
+
+
+class CitySerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = City
+        fields = ['name', 'image_url']
+
+    def get_image_url(self, obj):
+        if obj.image and hasattr(obj.image, 'url'):
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        return None
+    
+class DestinationSerializer(serializers.ModelSerializer):
+    city = CitySerializer()
+    tour_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Destination
+        fields = ['id', 'name', 'city', 'tour_count']
+
+    def get_tour_count(self, obj):
+        return getattr(obj, 'tour_count', 0)
+
+
+
+class CountryCityTourSerializer(serializers.ModelSerializer):
+    destination_set = DestinationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Country
+        fields = ['id', 'name', 'destination_set']
+
+

@@ -3,7 +3,9 @@ from rest_framework.response import Response
 from django.conf import settings
 import random
 from django.utils.timezone import now, timedelta
-from django.db.models import Count, Sum, Avg, Q, F,Case, When, IntegerField
+from django.db.models import Count, Sum, Avg, Q, F,Case, When, IntegerField,ExpressionWrapper, FloatField,Prefetch
+from django.core.cache import cache
+
 
 def custom_response(statusCode=200, message="Success", data=None):
     return Response({
@@ -82,30 +84,104 @@ def calculate_trending_score():
 
 
 
-def calculate_top_destinations():
-    from tours.models import Tour, Destination
+# def calculate_top_destinations():
+#     from tours.models import Destination
+#     from tours.serializers import DestinationSerializer
 
+#     thirty_days_ago = now() - timedelta(days=30)
+
+#     # Annotate Destinations with aggregated stats from related tours
+#     destinations = Destination.objects.annotate(
+#         tour_count=Count('tours', distinct=True),  # count of tours linked to destination
+#         total_bookings=Sum('tours__booking_count'),  # sum bookings on tours
+#         avg_rating=Avg('tours__rating_average'),  # average rating of tours
+#         recent_bookings=Sum(
+#             Case(
+#                 When(
+#                     tours__analytics__event_type='booking',
+#                     tours__analytics__timestamp__gte=thirty_days_ago,
+#                     then=1
+#                 ),
+#                 default=0,
+#                 output_field=IntegerField()
+#             )
+#         ),
+#         recent_views=Sum(
+#             Case(
+#                 When(
+#                     tours__analytics__event_type='view',
+#                     tours__analytics__timestamp__gte=thirty_days_ago,
+#                     then=1
+#                 ),
+#                 default=0,
+#                 output_field=IntegerField()
+#             )
+#         )
+#     ).annotate(
+#         popularity_score=(
+#             0.25 * F('tour_count') +
+#             0.3 * F('total_bookings') +
+#             0.25 * F('avg_rating') +
+#             0.1 * F('recent_bookings') +
+#             0.1 * F('recent_views')
+#         )
+#     ).order_by('-popularity_score')
+#     #  Serializing before caching
+#     serialized_result = DestinationSerializer(destinations, many=True).data
+#     cache.set("top_destinations", serialized_result, timeout=3600)  # Cache for 1 hour
+
+    
+
+#     return destinations
+
+def calculate_top_destinations():
     thirty_days_ago = now() - timedelta(days=30)
+    from tours.models import Destination
+    from location.models import Country
+    from tours.serializers import CountryCityTourSerializer
 
     destinations = Destination.objects.annotate(
-        tour_count=Count('tours'),
+        tour_count=Count('tours', distinct=True),
         total_bookings=Sum('tours__booking_count'),
         avg_rating=Avg('tours__rating_average'),
         recent_bookings=Sum(
             Case(
-                When(tours__analytics__event_type='booking', tours__analytics__timestamp__gte=thirty_days_ago, then=1),
+                When(
+                    tours__analytics__event_type='booking',
+                    tours__analytics__timestamp__gte=thirty_days_ago,
+                    then=1
+                ),
                 default=0,
                 output_field=IntegerField()
             )
-        )
+        ),
+        recent_views=Sum(
+            Case(
+                When(
+                    tours__analytics__event_type='view',
+                    tours__analytics__timestamp__gte=thirty_days_ago,
+                    then=1
+                ),
+                default=0,
+                output_field=IntegerField()
+            )
+        ),
     ).annotate(
-        popularity_score=(
-            0.3 * F('tour_count') +
-            0.4 * F('total_bookings') +
-            0.2 * F('avg_rating') +
-            0.1 * F('recent_bookings')
+        popularity_score=ExpressionWrapper(
+            0.25 * F('tour_count') +
+            0.3 * F('total_bookings') +
+            0.25 * F('avg_rating') +
+            0.1 * F('recent_bookings') +
+            0.1 * F('recent_views'),
+            output_field=FloatField()
         )
-    ).order_by('-popularity_score')
+    )
 
-    return destinations
+    # Prefetch by country
+    countries = Country.objects.prefetch_related(
+        Prefetch('destination_set', queryset=destinations)
+    )
+    serialized = CountryCityTourSerializer(countries, many=True).data
+    cache.set("top_destinations", serialized, timeout=86400)
 
+    return countries

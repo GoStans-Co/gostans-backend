@@ -11,6 +11,7 @@ class Country(models.Model):
 class City(models.Model):
     country = models.ForeignKey(Country, related_name='cities', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    image = models.ImageField(upload_to='cities/', null=True, blank=True)  # New image field
 
     def __str__(self):
         return self.name

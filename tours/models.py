@@ -123,6 +123,19 @@ class Tour(models.Model):
             return pricing.price if pricing else None
         return self.price
 
+    def save(self, *args, **kwargs):
+        # Auto-assign destination if not already set
+        if self.country and self.city:
+            from tours.models import Destination  # local import to avoid circular import
+            destination_name = f"{self.city.name}, {self.country.name}"
+            destination, _ = Destination.objects.get_or_create(
+                country=self.country,
+                city=self.city,
+                defaults={'name': destination_name}
+            )
+            self.destination = destination
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

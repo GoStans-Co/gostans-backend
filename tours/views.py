@@ -4,9 +4,9 @@ from rest_framework import generics,permissions
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from common.utils import custom_response,get_client_ip
-from .models import Tour,TourAnalytics,TourRating,Wishlist
-from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer
+from common.utils import custom_response,get_client_ip,calculate_top_destinations
+from .models import Tour,TourAnalytics,TourRating,Wishlist,Destination
+from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer,CountryCityTourSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
 from rest_framework import status
@@ -15,7 +15,13 @@ from customer_auth.authentication import CustomerUserJWTAuthentication
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from django.db.models import F,Count,Avg,Exists,OuterRef,Value,BooleanField
-
+from rest_framework.permissions import AllowAny
+from django.core.cache import cache
+from django.db.models import Count, Sum, Avg, Case, When, IntegerField, F
+from django.utils.timezone import now
+from datetime import timedelta
+from django.db.models import ExpressionWrapper, FloatField
+from location.models import Country
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -265,7 +271,7 @@ class SubmitRatingView(APIView):
             tour.save()
 
             return custom_response(
-                statusCode=200,
+                statusCode=status.HTTP_200_OK,
                 message="Rating submitted successfully",
                 data=serializer.data
             )
@@ -273,3 +279,105 @@ class SubmitRatingView(APIView):
         return custom_response(400, "Invalid data", serializer.errors)
 
 
+class TrendingToursAPIView(APIView):
+    permission_classes = [AllowAny]
+    @swagger_auto_schema(
+        operation_description="Public",
+        tags=["Public APIs"],
+    )
+
+    def get(self, request):
+        trending_tours = cache.get('trending_tours')
+        if not trending_tours:
+            tours = Tour.objects.filter(trending_score__gt=0).order_by('-trending_score')[:20]
+            serializer = TourListSerializer(tours, many=True)
+            trending_tours = serializer.data
+            cache.set('trending_tours', trending_tours, timeout=3600)  # cache for 1 hour
+
+        return custom_response(
+            statusCode= status.HTTP_200_OK,
+            message= "Trending tours retrieved successfully",
+            data= trending_tours
+        )
+    
+
+class TopDestinationsAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_description="List of top countries with cities and tour counts",
+        tags=["Public APIs"],
+        manual_parameters=[
+            openapi.Parameter(
+                name='country_id',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                required=False,
+                description='Filter destinations by country ID (from cached top destinations)'
+            )
+        ]
+    )
+    
+    def get(self, request):
+        country_id = request.query_params.get('country_id')
+        top_destinations = cache.get("top_destinations")
+        
+        if not top_destinations:
+            destinations = calculate_top_destinations()
+            serializer = CountryCityTourSerializer(destinations, many=True,context={'request': request})
+            top_destinations = serializer.data
+            cache.set("top_destinations", top_destinations, timeout=86400)  # Cache for 1 day
+            
+        if country_id and country_id != "all":
+            try:
+                country_id = int(country_id)
+                top_destinations = [country for country in top_destinations if country['id'] == country_id]
+            except ValueError:
+                return custom_response(
+                    statusCode=400,
+                    message="Invalid country_id. Must be an integer or 'all'.",
+                    data=[]
+                )
+        return custom_response(
+            statusCode=200,
+            message="Top destinations retrieved successfully",
+            data=top_destinations
+        )
+        
+        
+        
+    # def get(self, request):
+    #     top_destinations = cache.get('top_destinations')
+    #     if not top_destinations:
+    #         thirty_days_ago = now() - timedelta(days=30)
+
+    #         destinations = Destination.objects.annotate(
+    #             tour_count=Count('tours'),
+    #             total_bookings=Sum('tours__booking_count'),
+    #             avg_rating=Avg('tours__rating_average'),
+    #             recent_bookings=Sum(
+    #                 Case(
+    #                     When(
+    #                         tours__analytics__event_type='booking',
+    #                         tours__analytics__timestamp__gte=thirty_days_ago,
+    #                         then=1
+    #                     ),
+    #                     default=0,
+    #                     output_field=IntegerField()
+    #                 )
+    #             )
+    #         ).annotate(
+    #             popularity_score=ExpressionWrapper(
+    #                 0.3 * F('tour_count') +
+    #                 0.4 * F('total_bookings') +
+    #                 0.2 * F('avg_rating') +
+    #                 0.1 * F('recent_bookings'),
+    #                 output_field=FloatField()
+    #             )
+    #         ).order_by('-popularity_score')[:20]
+
+    #         serializer = DestinationSerializer(destinations, many=True)
+    #         top_destinations = serializer.data
+    #         cache.set('top_destinations', top_destinations, timeout=3600)  # cache for 1 hour
+
+       
