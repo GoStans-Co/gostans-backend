@@ -12,11 +12,16 @@ class CustomerUserAdminForm(forms.ModelForm):
 
 @admin.register(CustomerUser)
 class CustomerUserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'name', 'phone', 'is_active', 'date_joined','image_preview')
+    list_display = ('email', 'name', 'phone', 'is_active', 'date_joined','image_preview','get_oauth_provider')
     search_fields = ('email', 'name', 'phone')
     list_filter = ('is_active',)
     readonly_fields = ('image_preview',) 
     exclude = ['password']
+
+    def get_oauth_provider(self, obj):
+        return obj.oauth_provider or "DEFAULT"
+        
+    get_oauth_provider.short_description = 'Registered From'  
 
     def image_preview(self, obj):
         if obj.image and hasattr(obj.image, 'url'):

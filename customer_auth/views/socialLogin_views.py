@@ -8,7 +8,12 @@ from common.utils import custom_response
 from rest_framework import status
 from ..models import CustomerUser
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.cache import cache
+import logging
+import httpx
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class TelegramSignupAPIView(APIView):
 
@@ -138,4 +143,122 @@ class FacebookSignupAPIView(APIView):
                 "access_token": str(refresh.access_token),
                 "oauthProvider": "FACEBOOK",
             }
+        )
+
+
+class VerifyTelegramOTPAPIView(APIView):
+    def post(self, request):
+        otp = request.data.get("otp")
+        if not otp:
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="OTP required",
+                data={}
+            )
+        
+        data = cache.get(f"telegram_login_{otp}")
+       
+        logger.info(f"📦 Cache data: {data}")
+
+        if not data:
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Invalid or expired OTP",
+                data={}
+            )
+
+        user_id = data["user_id"]
+        phone = data["phone"]
+        name = data["name"]
+        email =data["email"]
+        user, created = CustomerUser.objects.get_or_create(
+            oauth_id=str(user_id),
+            defaults={
+                "phone": phone,
+                "oauth_provider": "TELEGRAM",
+                "name": name,
+                "email": email,
+            }
+        )
+
+        user_data = CustomerSocialSerializer(user).data
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+
+        def send_telegram_message(user_id: int, message: str):
+            bot_token = settings.TELEGRAM_BOT_TOKEN
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = {
+                "chat_id": user_id,
+                "text": message,
+            }
+            try:
+                response = httpx.post(url, json=payload)
+                response.raise_for_status()
+            except Exception as e:
+                logger.error(f"Error sending Telegram message: {e}")
+
+        login_msg = "🎉 Signup successful!" if created else "✅ Login successful!"
+        send_telegram_message(user_id, login_msg)
+        
+        return custom_response(
+            statusCode=status.HTTP_200_OK,
+            message="Login successful" if not created else "Signup successful",
+            data={
+                **user_data,
+                "oauthId": user.oauth_id,
+                "oauthProvider": user.oauth_provider,
+                "refresh": str(refresh),
+                "accessToken": access_token,
+            }
+        )
+
+   
+        otp = request.data.get("otp")
+        if not otp:
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="OTP required",
+                data={}
+            )
+        user_id = cache.get(f"user_id_for_otp_{otp}")
+        phone = cache.get(f"phone_for_otp_{otp}")
+        name = cache.get(f"name_for_otp_{otp}")
+
+        phone = None
+        if not user_id or not phone or not name:
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Invalid or expired OTP",
+                data={}
+            )
+        
+        user, created = CustomerUser.objects.get_or_create(
+            oauth_id=str(user_id),
+            defaults={
+                "phone": phone,
+                "oauth_provider": "TELEGRAM",
+                "name": name,
+                "email": None,
+                "image": ""
+            }
+        )
+
+        user_data = CustomerSocialSerializer(user).data
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+
+        response_data = {
+            **user_data,
+            "oauthid": user.oauth_id,
+            "oauthprovider": user.oauth_provider,
+            "image": user.image,
+            "refresh": str(refresh),
+            "accesstoken": access_token,
+        }
+
+        return custom_response(
+            statusCode=status.HTTP_200_OK,
+            message="Login successful" if not created else "Signup successful",
+            data=response_data
         )
