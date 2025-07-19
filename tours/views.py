@@ -282,9 +282,46 @@ class SubmitRatingView(APIView):
 class TrendingToursAPIView(APIView):
     permission_classes = [AllowAny]
     @swagger_auto_schema(
-        operation_description="Public",
+        operation_description="Get a list of trending tours (max 20).",
         tags=["Public APIs"],
+        responses={
+            200: openapi.Response(
+                description="Trending tours retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "statusCode": openapi.Schema(type=openapi.TYPE_INTEGER, example=200),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING, example="Trending tours retrieved successfully"),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(type=openapi.TYPE_INTEGER, example=607),
+                                    "uuid": openapi.Schema(type=openapi.TYPE_STRING, format="uuid", example="6ad5276f-a92a-47d2-9d7e-d873f4a60aa6"),
+                                    "title": openapi.Schema(type=openapi.TYPE_STRING, example="Costa Rica Quest"),
+                                    "shortDescription": openapi.Schema(type=openapi.TYPE_STRING, example="8-Day Northern Italy Tour of Milan..."),
+                                    "tourType": openapi.Schema(
+                                        type=openapi.TYPE_OBJECT,
+                                        nullable=True,
+                                        properties={
+                                            "id": openapi.Schema(type=openapi.TYPE_INTEGER, example=1046),
+                                            "name": openapi.Schema(type=openapi.TYPE_STRING, example="Beach Adventure")
+                                        }
+                                    ),
+                                    "price": openapi.Schema(type=openapi.TYPE_STRING, example="330.00"),
+                                    "currency": openapi.Schema(type=openapi.TYPE_STRING, example="USD"),
+                                    "mainImage": openapi.Schema(type=openapi.TYPE_STRING, format="uri", example="/media/tours/main_images/1099ttcgy2021-bilbao-tt-1.webp"),
+                                    "isLiked": openapi.Schema(type=openapi.TYPE_BOOLEAN, example=False),
+                                }
+                            )
+                        )
+                    }
+                )
+            )
+        }
     )
+    
 
     def get(self, request):
         trending_tours = cache.get('trending_tours')
@@ -303,20 +340,75 @@ class TrendingToursAPIView(APIView):
 
 class TopDestinationsAPIView(APIView):
     permission_classes = [AllowAny]
-
     @swagger_auto_schema(
         operation_description="List of top countries with cities and tour counts",
         tags=["Public APIs"],
         manual_parameters=[
-            openapi.Parameter(
-                name='country_id',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_INTEGER,
-                required=False,
-                description='Filter destinations by country ID (from cached top destinations)'
+        openapi.Parameter(
+            name='country_id',
+            in_=openapi.IN_QUERY,
+            type=openapi.TYPE_INTEGER,
+            required=False,
+            description='Filter destinations by country ID (from cached top destinations)'
+        )
+    ],
+        responses={
+            200: openapi.Response(
+                description="Top destinations retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "statusCode": openapi.Schema(type=openapi.TYPE_INTEGER, example=200),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING, example="Top destinations retrieved successfully"),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(type=openapi.TYPE_INTEGER, example=732),
+                                    "name": openapi.Schema(type=openapi.TYPE_STRING, example="Uzbekistan"),
+                                    "destinationSet": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(
+                                            type=openapi.TYPE_OBJECT,
+                                            properties={
+                                                "id": openapi.Schema(type=openapi.TYPE_INTEGER, example=13),
+                                                "name": openapi.Schema(type=openapi.TYPE_STRING, example="Bukhara, Uzbekistan"),
+                                                "city": openapi.Schema(
+                                                    type=openapi.TYPE_OBJECT,
+                                                    properties={
+                                                        "name": openapi.Schema(type=openapi.TYPE_STRING, example="Bukhara"),
+                                                        "imageUrl": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, example="https://api.gostans.com/media/cities/photo-1542314831-068cd1dbfeeb.jpeg")
+                                                    }
+                                                ),
+                                                "tourCount": openapi.Schema(type=openapi.TYPE_INTEGER, example=54)
+                                            }
+                                        )
+                                    )
+                                }
+                            )
+                        )
+                    }
+                )
+            ),
+            400: openapi.Response(
+                description="Invalid country_id",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "statusCode": openapi.Schema(type=openapi.TYPE_INTEGER, example=400),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING, example="Invalid country_id. Must be an integer or 'all'."),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(type=openapi.TYPE_OBJECT),  # ✅ Required
+                            example=[]
+                        )
+                    }
+                )
             )
-        ]
+        }
     )
+
     
     def get(self, request):
         country_id = request.query_params.get('country_id')
