@@ -1,0 +1,19 @@
+Copyright (c) 2025 GoStans-Co
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, and merge copies of the Software, subject to the following conditions:
+
+1. Non-Commercial Use Only:
+   The Software may only be used, copied, modified, or distributed for non-commercial purposes.
+   Any commercial use, including but not limited to resale, licensing, offering as a service, or integration into commercial products, is strictly prohibited without prior written permission from the copyright holder.
+
+2. Attribution Required:
+   You must retain the above copyright notice and this permission notice in all copies or substantial portions of the Software.
+
+3. No Warranty:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+   INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+For commercial licensing inquiries, contact: gostans.com@gmail.com
