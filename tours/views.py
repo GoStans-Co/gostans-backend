@@ -426,7 +426,7 @@ class TopDestinationsAPIView(APIView):
                         "message": openapi.Schema(type=openapi.TYPE_STRING, example="Invalid country_id. Must be an integer or 'all'."),
                         "data": openapi.Schema(
                             type=openapi.TYPE_ARRAY,
-                            items=openapi.Schema(type=openapi.TYPE_OBJECT),  # ✅ Required
+                            items=openapi.Schema(type=openapi.TYPE_OBJECT),  
                             example=[]
                         )
                     }
@@ -438,8 +438,8 @@ class TopDestinationsAPIView(APIView):
     
     def get(self, request):
         country_id = request.query_params.get('country_id')
-        top_destinations = cache.get("top_destinations")
-        
+        # top_destinations = cache.get("top_destinations")
+        top_destinations = ""
         if not top_destinations:
             destinations = calculate_top_destinations()
             serializer = CountryCityTourSerializer(destinations, many=True,context={'request': request})
