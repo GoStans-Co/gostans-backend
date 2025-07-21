@@ -144,3 +144,23 @@ class CountryCityTourSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'destination_set']
 
 
+class TrendingTourSerializer(serializers.ModelSerializer):
+    tour_type = TourTypeSerializer(read_only=True)
+    is_liked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tour
+        fields = [
+            'id',
+            'uuid',
+            'title',
+            'short_description',
+            'tour_type',
+            'price',
+            'currency',
+            'main_image',
+            'is_liked',
+        ]
+
+    def get_is_liked(self, obj):
+        return getattr(obj, 'is_liked', False)

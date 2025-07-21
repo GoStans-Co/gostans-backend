@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from common.utils import custom_response,get_client_ip,calculate_top_destinations
 from .models import Tour,TourAnalytics,TourRating,Wishlist,Destination
-from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer,CountryCityTourSerializer
+from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer,CountryCityTourSerializer,TrendingTourSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
 from rest_framework import status
@@ -327,7 +327,7 @@ class TrendingToursAPIView(APIView):
         trending_tours = cache.get('trending_tours')
         if not trending_tours:
             tours = Tour.objects.filter(trending_score__gt=0).order_by('-trending_score')[:20]
-            serializer = TourListSerializer(tours, many=True)
+            serializer = TrendingTourSerializer(tours, many=True, context={'request': request})
             trending_tours = serializer.data
             cache.set('trending_tours', trending_tours, timeout=3600)  # cache for 1 hour
 
