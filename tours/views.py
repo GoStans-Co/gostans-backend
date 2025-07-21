@@ -487,9 +487,54 @@ class ToursByDestinationAPIView(APIView):
             )
         ],
         responses={
-            200: openapi.Response(description="Tours retrieved successfully"),
-            400: openapi.Response(description="Invalid parameters"),
+            200: openapi.Response(
+                description="Tours retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "statusCode":openapi.Schema(type=openapi.TYPE_INTEGER, example=200),
+                        "message":openapi.Schema(type=openapi.TYPE_STRING,  example="Tours retrieved successfully"),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "results": openapi.Schema(
+                                    type=openapi.TYPE_ARRAY,
+                                    items=openapi.Schema(
+                                        type=openapi.TYPE_OBJECT,
+                                        properties={
+                                            "id": openapi.Schema(type=openapi.TYPE_INTEGER, example=531),
+                                            "uuid":openapi.Schema(type=openapi.TYPE_STRING, format="uuid", example="e6d95e29-5994-4638-9d95-d8770ee91e73"),
+                                            "title":openapi.Schema(type=openapi.TYPE_STRING, example="Cultural Wonders of Kyoto"),
+                                            "shortDescription": openapi.Schema(type=openapi.TYPE_STRING, example="Morning despite concern teach economic red…"),
+                                            "tourType":openapi.Schema(type=openapi.TYPE_OBJECT, nullable=True, 
+                                                properties={
+                                                    "id":   openapi.Schema(type=openapi.TYPE_INTEGER, example=1046),
+                                                    "name": openapi.Schema(type=openapi.TYPE_STRING,  example="Beach Adventure")
+                                                }
+                                            ),
+                                            "price": openapi.Schema(type=openapi.TYPE_STRING, example="330.00"),
+                                            "currency":openapi.Schema(type=openapi.TYPE_STRING, example="USD"),
+                                            "mainImage":openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, example="http://.../media/tours/..."),
+                                            "isLiked": openapi.Schema(type=openapi.TYPE_BOOLEAN, example=False),
+                                            "cityName": openapi.Schema(type=openapi.TYPE_STRING, example="Almaty"),
+                                            "countryName":openapi.Schema(type=openapi.TYPE_STRING, example="Kazakhstan"),
+                                        }
+                                    )
+                                ),
+                                "totalCount": openapi.Schema(type=openapi.TYPE_INTEGER, example=123),
+                                "page":       openapi.Schema(type=openapi.TYPE_INTEGER, example=1),
+                                "pageSize":   openapi.Schema(type=openapi.TYPE_INTEGER, example=20),
+                                "totalPages": openapi.Schema(type=openapi.TYPE_INTEGER, example=7),
+                                "next":       openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, example="http://.../?page=2"),
+                                "previous":   openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, example=None),
+                            }
+                        )
+                    }
+                )
+            ),
+            400: openapi.Response(description="Invalid parameters")
         }
+    
     )
     def get(self, request):
         country_id = request.query_params.get('country_id')
