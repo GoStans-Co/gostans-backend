@@ -438,8 +438,8 @@ class TopDestinationsAPIView(APIView):
     
     def get(self, request):
         country_id = request.query_params.get('country_id')
-        # top_destinations = cache.get("top_destinations")
-        top_destinations = ""
+        top_destinations = cache.get("top_destinations")
+        # top_destinations = ""
         if not top_destinations:
             destinations = calculate_top_destinations()
             serializer = CountryCityTourSerializer(destinations, many=True,context={'request': request})
