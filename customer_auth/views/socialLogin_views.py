@@ -3,7 +3,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.conf import settings
 from common.social_auth import verify_telegram_auth,verify_facebook_token
-from ..serializers import TelegramAuthSerializer,CustomerSocialSerializer,FacebookAuthSerializer
+from ..serializers import CustomerSocialSerializer,FacebookAuthSerializer
 from common.utils import custom_response
 from rest_framework import status
 from ..models import CustomerUser
@@ -11,69 +11,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.cache import cache
 import logging
 import httpx
+from django.db.models import Q
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-class TelegramSignupAPIView(APIView):
-
-    @swagger_auto_schema(
-        operation_description="Signup or login user with Telegram",
-        request_body=TelegramAuthSerializer,
-        tags=["Auth Controller"],
-        responses={
-            200: openapi.Response(
-                description="Signup/Login successful",
-                examples={"application/json": {"statusCode": 200, "message": "Signup successful", "data": {}}}
-            ),
-            400: openapi.Response(
-                description="Invalid signature",
-                examples={"application/json": {"statusCode": 400, "message": "Invalid signature", "data": {}}}
-            ),
-        }
-    )
-    
-    def post(self, request):
-        serializer = TelegramAuthSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data.copy()
-        
-        bot_token = settings.TELEGRAM_BOT_TOKEN  
-        if not verify_telegram_auth(data.copy(), bot_token):
-            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Invalid Telegram login signature",data=[])
-
-
-        telegram_id = str(data['id'])
-        user, created = CustomerUser.objects.get_or_create(
-            oauth_id=telegram_id,
-            defaults={
-                "name": data.get("first_name", ""),
-                "oauth_provider": "TELEGRAM",
-                "email": None,  # Telegram doesn't provide email
-                "phone": None,
-                "image": data.get("photo_url", "")
-            }
-        )
-        
-
-        user_data = CustomerSocialSerializer(user).data
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)   # {'access': ..., 'refresh': ...}
-
-        response_data = {
-           **user_data,
-            "oauthid": user.oauth_id,
-            "oauthprovider": user.oauth_provider,
-            "image": user.image,
-            "refresh": str(refresh),
-            "accesstoken": access_token,
-        }
-
-        return custom_response(
-            statusCode= status.HTTP_200_OK,
-            message= "Login successful" if not created else "Signup successful",
-            data= response_data
-        )
 
 
 class FacebookSignupAPIView(APIView):
@@ -158,7 +100,7 @@ class VerifyTelegramOTPAPIView(APIView):
         
         data = cache.get(f"telegram_login_{otp}")
        
-        logger.info(f"📦 Cache data: {data}")
+        logger.info(f" Cache data: {data}")
 
         if not data:
             return custom_response(
@@ -171,19 +113,29 @@ class VerifyTelegramOTPAPIView(APIView):
         phone = data["phone"]
         name = data["name"]
         email =data["email"]
-        user, created = CustomerUser.objects.get_or_create(
-            oauth_id=str(user_id),
-            defaults={
-                "phone": phone,
-                "oauth_provider": "TELEGRAM",
-                "name": name,
-                "email": email,
-            }
-        )
+        
+        existing_user = CustomerUser.objects.filter(Q(phone=phone) | Q(email=email)).first()
+        if existing_user:
+            if existing_user.oauth_provider != "TELEGRAM":
+                existing_user.oauth_id = str(user_id)
+                existing_user.oauth_provider = "TELEGRAM"
+                existing_user.save()
+            user = existing_user
+            created = False
+        else:
+            user = CustomerUser.objects.create(
+                oauth_id=str(user_id),
+                phone=phone,
+                oauth_provider="TELEGRAM",
+                name=name,
+                email=email
+            )
+            created = True
 
-        user_data = CustomerSocialSerializer(user).data
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
+        user_data = CustomerSocialSerializer(user).data
+        
 
         def send_telegram_message(user_id: int, message: str):
             bot_token = settings.TELEGRAM_BOT_TOKEN
@@ -200,7 +152,7 @@ class VerifyTelegramOTPAPIView(APIView):
 
         login_msg = "🎉 Signup successful!" if created else "✅ Login successful!"
         send_telegram_message(user_id, login_msg)
-        
+
         return custom_response(
             statusCode=status.HTTP_200_OK,
             message="Login successful" if not created else "Signup successful",
