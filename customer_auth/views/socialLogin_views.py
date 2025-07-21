@@ -89,6 +89,47 @@ class FacebookSignupAPIView(APIView):
 
 
 class VerifyTelegramOTPAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify Telegram OTP and login/signup user.",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["otp"],
+            properties={
+                "otp": openapi.Schema(type=openapi.TYPE_STRING, description="OTP sent via Telegram"),
+            },
+        ),
+        responses={
+            200: openapi.Response(
+                description="Login/Signup successful",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "Login successful",
+                        "data": {
+                            "uuid": "user-uuid",
+                            "email": "user@example.com",
+                            "name": "John Doe",
+                            "oauthId": "telegram-user-id",
+                            "oauthProvider": "TELEGRAM",
+                            "refresh": "refresh-token",
+                            "accessToken": "access-token",
+                        },
+                    }
+                },
+            ),
+            400: openapi.Response(
+                description="Invalid or expired OTP",
+                examples={
+                    "application/json": {
+                        "statusCode": 400,
+                        "message": "Invalid or expired OTP",
+                        "data": {},
+                    }
+                },
+            ),
+        },
+    )
     def post(self, request):
         otp = request.data.get("otp")
         if not otp:

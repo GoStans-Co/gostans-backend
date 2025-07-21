@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import requests
 
 def verify_telegram_auth(data: dict, bot_token: str) -> bool:
     
