@@ -4,8 +4,6 @@ import random
 import logging
 import re
 from decouple import config
-import asyncio
-
 
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -13,7 +11,6 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    ConversationHandler,
     filters,
 )
 
@@ -23,7 +20,12 @@ django.setup()
 
 from django.core.cache import cache
 
-logging.basicConfig(level=logging.INFO)
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = config("TELEGRAM_BOT_TOKEN")
@@ -41,13 +43,17 @@ def get_welcome_card(name="User"):
         f"⬇️ Send your contact (by clicking the button)"
     )
 
+
 def escape_markdown_v2(text: str) -> str:
     escape_chars = r'_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     name = user.first_name or "User"
+    logger.info(f"User {name} started the bot.")
+
     button = KeyboardButton("📱 Share Phone Number | 📱 Telefon raqamni ulashish", request_contact=True)
     markup = ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True)
 
@@ -57,15 +63,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     if not contact:
-        await update.message.reply_text("⚠️ Iltimos, tugmani bosib telefon raqamingizni yuboring / Please press the button to share your phone number.")
+        logger.warning("No contact received.")
+        await update.message.reply_text("⚠️ Iltimos, tugmani bosib telefon raqamingizni yuboring.")
         return
 
     phone = contact.phone_number
     user = update.effective_user
     full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-
     user_id = user.id
-    email = f"telegram@{full_name.replace(' ', '').lower()}.com"  # placeholder email
+    email = f"telegram@{full_name.replace(' ', '').lower()}.com"
 
     otp = str(random.randint(100000, 999999))
 
@@ -77,7 +83,14 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "email": email,
     }, timeout=300)
 
-    logger.info(f"📦 OTP stored for phone {phone}: {otp}")
+    logger.info(f"OTP {otp} generated and cached for {phone} (user_id={user_id})")
+     # Immediately get cache to confirm
+    cached_otp = cache.get(f"telegram_otp_{phone}")
+    cached_login_data = cache.get(f"telegram_login_{otp}")
+
+    logger.info(f"Cached OTP for {phone}: {cached_otp}")
+    logger.info(f"Cached login data for OTP {otp}: {cached_login_data}")
+    
     login_url = f"https://gostans.com/login?otp={otp}"
     otp_escaped = escape_markdown_v2(otp)
     login_url_escaped = escape_markdown_v2(login_url)
@@ -89,28 +102,24 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(otp_message, parse_mode="MarkdownV2")
-    return ConversationHandler.END
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚫 Amal bekor qilindi / Operation cancelled.")
-    return ConversationHandler.END
+    logger.info("User cancelled the operation.")
 
 
 def main():
+    logger.info("🚀 Starting Telegram bot...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(CommandHandler("cancel", cancel))
 
-    logger.info("✅ Bot is running...")
-    logger.info("🚀 Bot started successfully and is polling Telegram...")
+    logger.info("✅ Bot is now polling Telegram for updates.")
+    app.run_polling()
 
-    async def run():
-        # 🚨 This line clears any existing webhook and drops pending updates
-        await app.bot.delete_webhook(drop_pending_updates=True)
-        await app.run_polling()
 
-    asyncio.run(run())
-
+if __name__ == "__main__":
+    main()

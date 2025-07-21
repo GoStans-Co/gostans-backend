@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.conf import settings
-from common.social_auth import verify_telegram_auth,verify_facebook_token
+from common.social_auth import verify_facebook_token
 from ..serializers import CustomerSocialSerializer,FacebookAuthSerializer
 from common.utils import custom_response
 from rest_framework import status
