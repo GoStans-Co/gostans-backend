@@ -281,6 +281,9 @@ class SubmitRatingView(APIView):
 
 class TrendingToursAPIView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = [CustomerUserJWTAuthentication]
+    pagination_class = StandardResultsSetPagination 
+
     @swagger_auto_schema(
         operation_description="Get a list of trending tours (max 20).",
         tags=["Public APIs"],
@@ -324,18 +327,41 @@ class TrendingToursAPIView(APIView):
     
 
     def get(self, request):
-        trending_tours = cache.get('trending_tours')
-        if not trending_tours:
-            tours = Tour.objects.filter(trending_score__gt=0).order_by('-trending_score')[:20]
-            serializer = TrendingTourSerializer(tours, many=True, context={'request': request})
-            trending_tours = serializer.data
-            cache.set('trending_tours', trending_tours, timeout=3600)  # cache for 1 hour
+        trending_tour_ids = cache.get('trending_tour_ids')
+        if not trending_tour_ids:
+            trending_tour_ids = list(Tour.objects.filter(trending_score__gt=0)
+                                    .order_by('-trending_score')
+                                    .values_list('id', flat=True)[:20])
+            cache.set('trending_tour_ids', trending_tour_ids, timeout=3600) 
 
+        tours_qs = Tour.objects.filter(id__in=trending_tour_ids).order_by('-trending_score')
+
+        user = request.user
+        if user and user.is_authenticated:
+            wishlist_subquery = Wishlist.objects.filter(customer=user, tour=OuterRef('pk'))
+            tours_qs = tours_qs.annotate(is_liked=Exists(wishlist_subquery))
+        else:
+            tours_qs = tours_qs.annotate(is_liked=Value(False, output_field=BooleanField()))
+
+       
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(tours_qs, request, view=self)
+        serializer = TrendingTourSerializer(page, many=True, context={'request': request})
+        
         return custom_response(
-            statusCode= status.HTTP_200_OK,
-            message= "Trending tours retrieved successfully",
-            data= trending_tours
+            statusCode=status.HTTP_200_OK,
+            message="Trending tours retrieved successfully",
+            data={
+                "results": serializer.data,
+                "totalCount": paginator.page.paginator.count,
+                "page": paginator.page.number,
+                "pageSize": paginator.page.paginator.per_page,
+                "totalPages": paginator.page.paginator.num_pages,
+                "next": paginator.get_next_link(),
+                "previous": paginator.get_previous_link()
+            }
         )
+    
     
 
 class TopDestinationsAPIView(APIView):
@@ -435,41 +461,95 @@ class TopDestinationsAPIView(APIView):
             message="Top destinations retrieved successfully",
             data=top_destinations
         )
-        
-        
-        
-    # def get(self, request):
-    #     top_destinations = cache.get('top_destinations')
-    #     if not top_destinations:
-    #         thirty_days_ago = now() - timedelta(days=30)
-
-    #         destinations = Destination.objects.annotate(
-    #             tour_count=Count('tours'),
-    #             total_bookings=Sum('tours__booking_count'),
-    #             avg_rating=Avg('tours__rating_average'),
-    #             recent_bookings=Sum(
-    #                 Case(
-    #                     When(
-    #                         tours__analytics__event_type='booking',
-    #                         tours__analytics__timestamp__gte=thirty_days_ago,
-    #                         then=1
-    #                     ),
-    #                     default=0,
-    #                     output_field=IntegerField()
-    #                 )
-    #             )
-    #         ).annotate(
-    #             popularity_score=ExpressionWrapper(
-    #                 0.3 * F('tour_count') +
-    #                 0.4 * F('total_bookings') +
-    #                 0.2 * F('avg_rating') +
-    #                 0.1 * F('recent_bookings'),
-    #                 output_field=FloatField()
-    #             )
-    #         ).order_by('-popularity_score')[:20]
-
-    #         serializer = DestinationSerializer(destinations, many=True)
-    #         top_destinations = serializer.data
-    #         cache.set('top_destinations', top_destinations, timeout=3600)  # cache for 1 hour
-
        
+class ToursByDestinationAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = [CustomerUserJWTAuthentication]
+    pagination_class = StandardResultsSetPagination
+
+    @swagger_auto_schema(
+        operation_description="Get tours tagged with top destinations by country and city",
+        tags=["Public APIs"],
+        manual_parameters=[
+            openapi.Parameter(
+                name='country_id',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                required=True,
+                description='ID of the country'
+            ),
+            openapi.Parameter(
+                name='city_id',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                required=True,
+                description='ID of the city'
+            )
+        ],
+        responses={
+            200: openapi.Response(description="Tours retrieved successfully"),
+            400: openapi.Response(description="Invalid parameters"),
+        }
+    )
+    def get(self, request):
+        country_id = request.query_params.get('country_id')
+        city_id = request.query_params.get('city_id')
+
+        if not country_id or not city_id:
+            return custom_response(400, "country_id and city_id are required", [])
+
+        try:
+            country_id = int(country_id)
+            city_id = int(city_id)
+        except ValueError:
+            return custom_response(400, "Invalid country_id or city_id", [])
+
+        # Get cached top destinations data
+        top_destinations = cache.get("top_destinations")
+        if not top_destinations:
+            return custom_response(400, "Top destinations cache is empty, try again later.", [])
+
+        # Find the matching country in cached data
+        country_data = next((c for c in top_destinations if c['id'] == country_id), None)
+        if not country_data:
+            return custom_response(400, "Country not found in top destinations", [])
+
+
+        city_destinations = [
+            dest for dest in country_data.get('destination_set', [])
+            if dest.get('city') and dest['city'].get('id') == city_id
+        ]
+
+        if not city_destinations:
+            return custom_response(200, "No top destinations found for this city", [])
+
+        # Extract destination IDs
+        destination_ids = [dest['id'] for dest in city_destinations]
+        user = request.user
+        tours_qs = Tour.objects.filter(destination_id__in=destination_ids).order_by('-trending_score')[:50]
+
+        if user and user.is_authenticated:
+            wishlist_subquery = Wishlist.objects.filter(customer=user, tour=OuterRef('pk'))
+            tours_qs = tours_qs.annotate(is_liked=Exists(wishlist_subquery))
+        else:
+            tours_qs = tours_qs.annotate(is_liked=Value(False, output_field=BooleanField()))
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(tours_qs, request, view=self)
+
+        serializer = TourListSerializer(page, many=True, context={'request': request})
+
+        return custom_response(
+            statusCode=status.HTTP_200_OK,
+            message="Tours retrieved successfully",
+            data={
+                "results": serializer.data,
+                "totalCount": paginator.page.paginator.count,
+                "page": paginator.page.number,
+                "pageSize": paginator.page.paginator.per_page,
+                "totalPages": paginator.page.paginator.num_pages,
+                "next": paginator.get_next_link(),
+                "previous": paginator.get_previous_link()
+            }
+        )
+

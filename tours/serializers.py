@@ -15,10 +15,12 @@ class TourTypeSerializer(serializers.ModelSerializer):
 class TourListSerializer(serializers.ModelSerializer):
     tour_type = TourTypeSerializer(read_only=True)
     is_liked = serializers.SerializerMethodField()
+    city_name = serializers.CharField(source='city.name', read_only=True)
+    country_name = serializers.CharField(source='city.country.name', read_only=True)
 
     class Meta:
         model = Tour
-        fields = ['id','uuid', 'title', 'short_description', 'tour_type', 'price', 'currency', 'main_image','is_liked']
+        fields = ['id','uuid', 'title', 'short_description', 'tour_type', 'price', 'currency', 'main_image','is_liked','city_name','country_name']
 
     def get_is_liked(self, obj):
         return getattr(obj, 'is_liked', False)
@@ -115,7 +117,7 @@ class CitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = City
-        fields = ['name', 'image_url']
+        fields = ['id','name', 'image_url']
 
     def get_image_url(self, obj):
         if obj.image and hasattr(obj.image, 'url'):
