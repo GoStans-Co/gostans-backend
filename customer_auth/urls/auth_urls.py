@@ -13,7 +13,6 @@ from customer_auth.views import (
     CheckEmailExistsView,
     ResendVerificationEmailView,
     VerifyEmailView,
-    
 )
 
 urlpatterns = [

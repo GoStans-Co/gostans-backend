@@ -224,7 +224,43 @@ class ResendVerificationEmailView(APIView):
         except CustomerUser.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
  
+
 class VerifyEmailView(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify user email using token from email link.",
+        tags=["Auth Controller"],
+        manual_parameters=[
+            openapi.Parameter(
+                name="token",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                required=True,
+                description="The email verification token sent to the user",
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Email verified successfully",
+                examples={
+                    "application/json": {
+                        "status": 200,
+                        "message": "Email verified successfully!",
+                        "data": {}
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid or expired token",
+                examples={
+                    "application/json": {
+                        "status": 400,
+                        "message": "Invalid or expired token.",
+                        "data": {}
+                    }
+                }
+            )
+        }
+    )
     def get(self, request):
         token = request.GET.get('token')
         try:
