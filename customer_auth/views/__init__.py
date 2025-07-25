@@ -5,8 +5,9 @@ from .views import (
     CustomTokenRefreshView,
     GoogleSignupAPIView,
     SendOTPView,
-    VerifyOTPView
-    
+    VerifyOTPView,ForgotPasswordView,ResendOTPView,VerifyOTPEmailView,ResetPasswordView,
+    CheckEmailExistsView,ResendVerificationEmailView,VerifyEmailView
+
 )
 
 # Import views from user_views.py

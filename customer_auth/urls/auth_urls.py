@@ -6,6 +6,13 @@ from customer_auth.views import (
     GoogleSignupAPIView,
     SendOTPView,
     VerifyOTPView,
+    ForgotPasswordView,
+    ResendOTPView,
+    VerifyOTPEmailView,
+    ResetPasswordView,
+    CheckEmailExistsView,
+    ResendVerificationEmailView,
+    VerifyEmailView,
     
 )
 
@@ -16,5 +23,11 @@ urlpatterns = [
     path('google/', GoogleSignupAPIView.as_view(), name='google-signup'),
     path('send-otp/', SendOTPView.as_view(), name='send-otp'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
-   
+    path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
+    path('resend-otp/', ResendOTPView.as_view(), name='resend-otp'),
+    path('verify-otp-email/', VerifyOTPEmailView.as_view(), name='resend-otp'),
+    path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('check-email/', CheckEmailExistsView.as_view(), name='check_email'),
+    path('resend-verification-email/', ResendVerificationEmailView.as_view(), name='check_email'),
+    path('verify-email/', VerifyEmailView.as_view(), name='verify-email')
 ]

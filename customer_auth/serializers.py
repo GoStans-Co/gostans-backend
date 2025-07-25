@@ -9,6 +9,10 @@ from tours.serializers import WishlistTourSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 import phonenumbers
 from order.models import SavedCard
+from common.social_auth import  generate_otp,send_verification_email, send_welcome_email
+from django.utils.crypto import get_random_string
+
+
 
 
 
@@ -62,7 +66,13 @@ class CustomerUserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])  # Hash password
-        return CustomerUser.objects.create(**validated_data)
+        user = CustomerUser.objects.create(**validated_data)
+        user.email_verification_token = get_random_string(length=48)
+        user.save()
+
+        send_verification_email(user)
+
+        return user
     
     def update(self, instance, validated_data):
         """Handle user profile update"""
@@ -75,6 +85,7 @@ class CustomerUserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+       
 class CustomerUserProfileSerializer(serializers.ModelSerializer):
     wishlists = serializers.SerializerMethodField()
     is_verified = serializers.SerializerMethodField()

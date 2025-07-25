@@ -28,7 +28,9 @@ class CustomerUser(models.Model):
 
     oauth_id = models.CharField(max_length=255, blank=True, null=True, verbose_name=_("OAuth ID"))
     oauth_provider = models.CharField(max_length=50, blank=True, null=True, verbose_name=_("OAuth Provider"))
-    
+    is_email_verified = models.BooleanField(default=False, verbose_name=_("Is Email Verified"))
+    email_verification_token = models.CharField(max_length=64, blank=True, null=True)
+
 
     def __str__(self):
         return self.email

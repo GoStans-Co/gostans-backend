@@ -14,13 +14,18 @@ from google.auth.transport import requests
 import random
 import string
 from django.utils.crypto import get_random_string
-from common.utils import custom_response,generate_otp
+from common.utils import custom_response
+from common.social_auth import  generate_otp, send_otp_email, send_welcome_email
 from datetime import timedelta
 from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-import time
+from django.core.cache import cache
+from django.contrib.auth.hashers import make_password
+from django.core.mail import send_mail
+
+
 
 User = CustomerUser  # Use this instead of get_user_model()
 
@@ -84,7 +89,8 @@ class CustomerLoginView(APIView):
             'token': access_token,
             'refresh': str(refresh),
             'ip_address': ip_address,
-            'user': user_data
+            'user': user_data,
+            "message": "Login successful. Please verify your email to unlock full features.",
         }, status=status.HTTP_200_OK)
         
 
@@ -136,6 +142,103 @@ class CustomerUserSignupView(APIView):
             data=serializer.errors
         )
 
+
+class CheckEmailExistsView(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Check if an email already exists in the system.",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["email"],
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL)
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Email existence result",
+                examples={
+                    "application/json": {
+                        "email_exists": True
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid request",
+                examples={
+                    "application/json": {
+                        "error": "Email is required"
+                    }
+                }
+            )
+        }
+    )
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        exists = CustomerUser.objects.filter(email=email).exists()
+        return Response({'email_exists': exists}, status=status.HTTP_200_OK)
+
+class ResendVerificationEmailView(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Resend verification email to a user.",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["email"],
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, format='email', description='Registered user email'),
+            },
+        ),
+        responses={
+            200: openapi.Response(
+                description="Success response",
+                examples={
+                    "application/json": {"message": "Verification email resent"},
+                },
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={
+                    "application/json": {"error": "User not found"},
+                },
+            ),
+        },
+    )
+    def post(self, request):
+        email = request.data.get('email')
+        try:
+            user = CustomerUser.objects.get(email=email)
+            if user.is_email_verified:
+                return Response({'message': 'Email already verified'}, status=200)
+
+            user.email_verification_token = get_random_string(length=48)
+            user.save()
+            # Reuse send_verification_email logic
+            CustomerUserSerializer().send_verification_email(user)
+            return Response({'message': 'Verification email resent'}, status=200)
+        except CustomerUser.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+ 
+class VerifyEmailView(APIView):
+    def get(self, request):
+        token = request.GET.get('token')
+        try:
+            user = CustomerUser.objects.get(email_verification_token=token)
+            user.is_email_verified = True
+            user.email_verification_token = None  # Invalidate token
+            user.save()
+
+            # Now send welcome email
+            send_welcome_email(user)
+
+            return custom_response(200, "Email verified successfully!", {})
+        except CustomerUser.DoesNotExist:
+            return custom_response(400, "Invalid or expired token.", {})
 
 class CustomTokenRefreshView(TokenRefreshView):
 
@@ -288,6 +391,10 @@ class GoogleSignupAPIView(APIView):
                     'password': get_random_string(length=32),  # Will be hashed in model manager
                 }
             )
+
+            if created:
+                send_welcome_email(user)
+
             user_data = CustomerSocialSerializer(user).data
             # Generate JWT Token
             refresh = RefreshToken.for_user(user)
@@ -413,7 +520,7 @@ class VerifyOTPView(APIView):
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
         if not serializer.is_valid():
-            return custom_response(statusCode=400, message="Invalid data", data=serializer.errors)
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Invalid data", data=serializer.errors)
 
         phone = serializer.validated_data['phone']
         otp_input = serializer.validated_data['otp']
@@ -429,13 +536,261 @@ class VerifyOTPView(APIView):
         ).first()
 
         if not otp_obj:
-            return custom_response(statusCode=400, message="Invalid or expired OTP")
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Invalid or expired OTP")
 
         # OTP verified successfully, delete it (one-time use)
         otp_obj.delete()
 
         # TODO: Perform user login/signup or token generation here
 
-        return custom_response(statusCode=200, message="OTP verified successfully")
+        return custom_response(statusCode=status.HTTP_200_OK, message="OTP verified successfully")
 
 
+class ForgotPasswordView(APIView):
+    @swagger_auto_schema(
+        operation_summary="Request OTP for password reset",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["email"],
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL),
+            },
+            example={"email": "user@example.com"}
+        ),
+        responses={
+            200: openapi.Response(
+                description="OTP sent",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "OTP sent to your email",
+                        "data": {}
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={
+                    "application/json": {
+                        "statusCode": 404,
+                        "message": "User not found",
+                        "data": {}
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Missing email",
+                examples={
+                    "application/json": {
+                        "statusCode": 400,
+                        "message": "Email is required",
+                        "data": {}
+                    }
+                }
+            ),
+        }
+    )
+    def post(self, request):
+        email = request.data.get('email')
+
+        if not email:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Email is required")
+        
+        try:
+            user = CustomerUser.objects.get(email=email)
+        except CustomerUser.DoesNotExist:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="User not found")
+
+        otp = generate_otp()
+        send_otp_email(email, otp,name=user.name or "User")
+
+        # Save OTP in memory (using Redis cache)
+        cache.set(f"otp:{email}", otp, timeout=300)
+
+        return custom_response(statusCode=status.HTTP_200_OK, message="OTP sent to your email")
+
+class ResendOTPView(APIView):
+    @swagger_auto_schema(
+        operation_summary="Resend OTP for password reset",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["email"],
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL),
+            },
+            example={"email": "user@example.com"}
+        ),
+        responses={
+            200: openapi.Response(
+                description="OTP resent",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "OTP resent to your email",
+                        "data": {}
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={
+                    "application/json": {
+                        "statusCode": 404,
+                        "message": "User not found",
+                        "data": {}
+                    }
+                }
+            ),
+            429: openapi.Response(
+                description="Too many requests",
+                examples={
+                    "application/json": {
+                        "statusCode": 429,
+                        "message": "OTP was already sent recently. Please wait.",
+                        "data": {}
+                    }
+                }
+            ),
+        }
+    )
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Email is required")
+
+        try:
+            user = CustomerUser.objects.get(email=email)
+        except CustomerUser.DoesNotExist:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="User not found")
+
+        # Cooldown key to prevent spam
+        cooldown_key = f"otp:resend_lock:{email}"
+        if cache.get(cooldown_key):
+            return custom_response(statusCode=status.HTTP_429_TOO_MANY_REQUESTS, message="OTP was already sent recently. Please wait.")
+
+        # Generate or reuse OTP
+        otp = generate_otp()
+        cache.set(f"otp:{email}", otp, timeout=300)  # Reset OTP with 5 min TTL
+        cache.set(cooldown_key, True, timeout=30)    # Cooldown for 30 seconds
+
+        send_otp_email(email, otp,name=user.name or "User")
+        return custom_response(statusCode=status.HTTP_200_OK, message="OTP resent to your email")
+
+class VerifyOTPEmailView(APIView):
+    @swagger_auto_schema(
+        operation_summary="Verify OTP for password reset",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["email", "otp"],
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL),
+                "otp": openapi.Schema(type=openapi.TYPE_STRING, description="OTP sent to email"),
+            },
+            example={"email": "user@example.com", "otp": "1234"}
+        ),
+        responses={
+            200: openapi.Response(
+                description="OTP verified successfully",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "OTP verified successfully",
+                        "data": {}
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid or expired OTP",
+                examples={
+                    "application/json": {
+                        "statusCode": 400,
+                        "message": "Invalid or expired OTP",
+                        "data": {}
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={
+                    "application/json": {
+                        "statusCode": 404,
+                        "message": "User not found",
+                        "data": {}
+                    }
+                }
+            ),
+        }
+    )
+    def post(self, request):
+        email = request.data.get("email")
+        otp_submitted = request.data.get("otp")
+
+        if not email or not otp_submitted:
+            return custom_response(400, "Email and OTP are required")
+
+        try:
+            user = CustomerUser.objects.get(email=email)
+        except CustomerUser.DoesNotExist:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="User not found")
+
+        # Fetch OTP from cache
+        otp_cached = cache.get(f"otp:{email}")
+
+        if otp_cached is None:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="OTP expired or not found")
+
+        if str(otp_cached) != str(otp_submitted):
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Invalid OTP")
+
+        # Optionally: delete the OTP after successful verification
+        cache.delete(f"otp:{email}")
+
+        return custom_response(statusCode=status.HTTP_200_OK, message="OTP verified successfully")
+
+
+class ResetPasswordView(APIView):
+    @swagger_auto_schema(
+        operation_summary="Reset user password",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["email", "new_password"],
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL),
+                "new_password": openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            example={"email": "user@example.com", "new_password": "new_secure_password123"}
+        ),
+        responses={
+            200: openapi.Response(
+                description="Password reset successfully",
+                examples={"application/json": {"statusCode": 200, "message": "Password reset successful", "data": {}}}
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={"application/json": {"statusCode": 404, "message": "User not found", "data": {}}}
+            ),
+        }
+    )
+    def post(self, request):
+        email = request.data.get('email')
+        new_password = request.data.get('new_password')
+
+        if not email or not new_password:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="Email and new password are required")
+
+        try:
+            user = CustomerUser.objects.get(email=email)
+        except CustomerUser.DoesNotExist:
+            return custom_response(statusCode=status.HTTP_400_BAD_REQUEST, message="User not found")
+
+        user.password = make_password(new_password)
+        user.save()
+
+        # Optional: Invalidate existing OTP
+        cache.delete(f"otp:{email}")
+
+        return custom_response(statusCode=status.HTTP_200_OK, message="Password reset successful")
