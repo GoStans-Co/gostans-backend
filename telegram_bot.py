@@ -5,7 +5,9 @@ import logging
 import re
 from decouple import config
 
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup,InlineKeyboardButton,InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -60,6 +62,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_welcome_card(name), reply_markup=markup)
 
 
+async def resend_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_id = user.id
+
+    # Try to find the last phone number used by this user
+    phone = cache.get(f"user_phone_{user_id}")
+        
+    if not phone:
+        await update.message.reply_text("❌ Phone number not found. Please press /start and share your phone number.")
+        return
+
+    # Generate new OTP
+    otp = str(random.randint(100000, 999999))
+
+    cache.set(f"telegram_otp_{phone}", otp, timeout=300)
+    cache.set(f"telegram_login_{otp}", {
+        "user_id": user_id,
+        "phone": phone,
+        "name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        "email": f"telegram@{user.username or user_id}.com",
+    }, timeout=300)
+
+    login_url = f"https://gostans.com/login?otp={otp}"
+    otp_escaped = escape_markdown_v2(otp)
+    login_url_escaped = escape_markdown_v2(login_url)
+    login_display = escape_markdown_v2("gostans.com/login")
+
+    otp_message = (
+        f"🔄 Yangi kod: `{otp_escaped}`\n"
+        f"🔗 Kirish: [{login_display}]({login_url_escaped})"
+    )
+
+    logger.info(f"Resent OTP {otp} to user_id={user_id} for phone={phone}")
+    await update.message.reply_text(otp_message, parse_mode="MarkdownV2")
+
+
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     if not contact:
@@ -72,9 +110,10 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
     user_id = user.id
     email = f"telegram@{full_name.replace(' ', '').lower()}.com"
-
+    
     otp = str(random.randint(100000, 999999))
 
+    cache.set(f"user_phone_{user_id}", phone, timeout=300)
     cache.set(f"telegram_otp_{phone}", otp, timeout=300)
     cache.set(f"telegram_login_{otp}", {
         "user_id": user_id,
@@ -100,13 +139,58 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔒 Code: `{otp_escaped}`\n"
         f"🔗 Click and Login: [{login_display}]({login_url_escaped})"
     )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔁 Resend Code", callback_data="resend_otp")]
+    ])
 
-    await update.message.reply_text(otp_message, parse_mode="MarkdownV2")
+    await update.message.reply_text(otp_message, parse_mode="MarkdownV2",reply_markup=keyboard)
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚫 Amal bekor qilindi / Operation cancelled.")
     logger.info("User cancelled the operation.")
+
+
+async def handle_resend_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()  # Acknowledge the callback
+
+    user = query.from_user
+    user_id = user.id
+
+    # Search for the phone number in cache
+    phone = cache.get(f"user_phone_{user_id}")
+
+
+    if not phone:
+        await query.edit_message_text("❌ Phone number not found. Please press /start and share your phone number.")
+        return
+
+    otp = str(random.randint(100000, 999999))
+
+    cache.set(f"telegram_otp_{phone}", otp, timeout=300)
+    cache.set(f"telegram_login_{otp}", {
+        "user_id": user_id,
+        "phone": phone,
+        "name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        "email": f"telegram@{user.username or user_id}.com",
+    }, timeout=300)
+
+    login_url = f"https://gostans.com/login?otp={otp}"
+    otp_escaped = escape_markdown_v2(otp)
+    login_url_escaped = escape_markdown_v2(login_url)
+    login_display = escape_markdown_v2("gostans.com/login")
+
+    otp_message = (
+        f"🔄 Yangi kod: `{otp_escaped}`\n"
+        f"🔗 Kirish: [{login_display}]({login_url_escaped})"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔁 Resend Code", callback_data="resend_otp")]
+    ])
+
+    await query.edit_message_text(text=otp_message, parse_mode="MarkdownV2", reply_markup=keyboard)
 
 
 def main():
@@ -115,7 +199,9 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-    app.add_handler(CommandHandler("cancel", cancel))
+    app.add_handler(CommandHandler("resend", resend_otp))
+    app.add_handler(CommandHandler("cancel", cancel))   
+    app.add_handler(CallbackQueryHandler(handle_resend_callback, pattern="^resend_otp$"))
 
     logger.info("✅ Bot is now polling Telegram for updates.")
     app.run_polling()
