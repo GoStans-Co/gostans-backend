@@ -90,8 +90,8 @@ async def resend_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     login_display = escape_markdown_v2("gostans.com/login")
 
     otp_message = (
-        f"🔄 Yangi kod: `{otp_escaped}`\n"
-        f"🔗 Kirish: [{login_display}]({login_url_escaped})"
+        f"🔒 Code: `{otp_escaped}`\n"
+        f"🔗 Click and Login: [{login_display}]({login_url_escaped})"
     )
 
     logger.info(f"Resent OTP {otp} to user_id={user_id} for phone={phone}")
@@ -182,8 +182,8 @@ async def handle_resend_callback(update: Update, context: ContextTypes.DEFAULT_T
     login_display = escape_markdown_v2("gostans.com/login")
 
     otp_message = (
-        f"🔄 Yangi kod: `{otp_escaped}`\n"
-        f"🔗 Kirish: [{login_display}]({login_url_escaped})"
+        f"🔒 Code: `{otp_escaped}`\n"
+        f"🔗Click and Login: [{login_display}]({login_url_escaped})"
     )
 
     keyboard = InlineKeyboardMarkup([
