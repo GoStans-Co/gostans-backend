@@ -13,7 +13,7 @@ from common.utils import custom_response
 class CountryWithCitiesAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Retrieve a list of all countries along with their associated cities.",
-        tags=["Country Controller"],
+        tags=["Public APIs"],
         responses={
             200: openapi.Response(
                 description="Countries with cities retrieved successfully",
@@ -64,15 +64,15 @@ class CountryWithCitiesAPIView(APIView):
         countries = Country.objects.prefetch_related('cities').all()
         if not countries.exists():
             return custom_response(
-                status_code=status.HTTP_200_OK,
-                message="No countries found.",
-                data={"country_data": []}
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="No countries found",
+                data={}
             )
 
         serializer = CountryWithCitiesSerializer(countries, many=True)
         return custom_response(
-            status_code=status.HTTP_200_OK,
+            statusCode=status.HTTP_200_OK,
             message="Countries with cities retrieved successfully.",
-            data={"country_data": serializer.data}
+            data={serializer.data}
         )
         
