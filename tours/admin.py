@@ -5,6 +5,8 @@ from .models import Tour, TourType, TourImage, IncludedItem, ExcludedItem, Itine
 from django import forms
 from partners.models import PartnerProfile
 from django.core.exceptions import ValidationError
+from django.contrib import messages
+
 
 
 
@@ -47,6 +49,8 @@ class TourPricingInline(admin.TabularInline):
 
 @admin.register(Tour)
 class TourAdmin(admin.ModelAdmin):
+    search_fields = ['title','city__name','country__name','partner__user__username']
+    
     formfield_overrides = {
         MultiSelectField: {'widget': forms.SelectMultiple(attrs={'size': '4', 'style': 'width: 400px;'})},
     }
@@ -120,6 +124,10 @@ class TourAdmin(admin.ModelAdmin):
         except PartnerProfile.DoesNotExist:
             return False
 
+    def changelist_view(self, request, extra_context=None):
+        messages.info(request, "🔍 You can search by: Tour Title, City Name, Country Name and Author Name.")
+        return super().changelist_view(request, extra_context)
+    
     def save_model(self, request, obj, form, change):
         if not change:
             if request.user.is_superuser:

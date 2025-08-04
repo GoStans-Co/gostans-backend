@@ -20,7 +20,7 @@ class TourListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tour
-        fields = ['id','uuid', 'title', 'short_description', 'tour_type', 'price', 'currency', 'main_image','is_liked','city_name','country_name']
+        fields = ['id','uuid', 'title', 'short_description', 'tour_type', 'price', 'currency', 'main_image','is_liked','city_name','country_name','trip_start_date','trip_end_date']
 
     def get_is_liked(self, obj):
         return getattr(obj, 'is_liked', False)
@@ -73,7 +73,7 @@ class TourDetailSerializer(serializers.ModelSerializer):
             'id','uuid', 'title', 'short_description', 'tour_type', 'duration', 'about', 'price', 'currency',
             'trip_start_date', 'trip_end_date', 'country', 'city', 'group_size', 'language',
             'age_min', 'age_max', 'partner', 'tags', 'main_image', 'created_at',
-            'images', 'itineraries', 'agepricing','excludedItem','includedItem','is_liked'
+            'images', 'itineraries', 'agepricing','excludedItem','includedItem','is_liked','trip_start_date','trip_end_date'
         ] 
     def get_is_liked(self, obj):
         return getattr(obj, 'is_liked', False)       

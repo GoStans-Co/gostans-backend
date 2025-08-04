@@ -137,7 +137,6 @@ class TourListAPIView(generics.ListAPIView):
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             paginated_data = self.get_paginated_response(serializer.data).data
-            # Add count explicitly (optional; usually included)
             paginated_data["count"] = total_count
             return custom_response(
                 statusCode=status.HTTP_200_OK,
@@ -442,7 +441,7 @@ class TopDestinationsAPIView(APIView):
         # top_destinations = ""
         if not top_destinations:
             destinations = calculate_top_destinations()
-            serializer = CountryCityTourSerializer(destinations, many=True,context={'request': request})
+            serializer = CountryCityTourSerializer(destinations, many=True, context={'request': request})
             top_destinations = serializer.data
             cache.set("top_destinations", top_destinations, timeout=86400)  # Cache for 1 day
             

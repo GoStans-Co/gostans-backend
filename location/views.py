@@ -73,6 +73,6 @@ class CountryWithCitiesAPIView(APIView):
         return custom_response(
             statusCode=status.HTTP_200_OK,
             message="Countries with cities retrieved successfully.",
-            data={serializer.data}
+            data={"country_data": list(serializer.data)}
         )
         
