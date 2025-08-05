@@ -48,12 +48,12 @@ def send_otp_email(email, otp,name="User"):
 
 
 def send_verification_email(user):
-    from_email = 'Gostans  <noreply@gostans.com>'
+    from_email = 'GoStans  <noreply@gostans.com>'
     """
     Sends an email verification link to the newly registered user.
     """
     verification_link = f"https://api.gostans.com/api/v1/auth/verify-email/?token={user.email_verification_token}"
-    subject = "Welcome to Gostans! Verify your email"
+    subject = "Welcome to GoStans! Verify your email"
     html_content = render_to_string("emails/verify_email.html", {
         "userName": user.name or "User",
         "verification_link": verification_link
@@ -66,11 +66,11 @@ def send_verification_email(user):
 
 
 def send_welcome_email(user):
-    from_email = 'Gostans  <noreply@gostans.com>'
+    from_email = 'GoStans  <noreply@gostans.com>'
     """
     Sends a welcome email after successful registration (optional).
     """
-    subject = "Welcome to Gostans 🎉"
+    subject = "Welcome to GoStans 🎉"
     html_content = render_to_string("emails/welcome_email.html", {
         "userName": user.name or "User",
     })
