@@ -114,6 +114,7 @@ class TourBookingSerializer(serializers.ModelSerializer):
             'created_at'
         ]
 
+
 class CardholderInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = CardholderInfo

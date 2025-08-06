@@ -133,9 +133,49 @@ class CustomerUserProfileView(APIView):
                             "updated_at": "2025-06-22 17:01",
                             "is_verified": True,
                             "bookings": {
-                                "all": [],
-                                "upcoming": [],
-                                "completed": []
+                                "all": [
+                                    {
+                                        "id": 3,
+                                        "uuid": "6ad5276f-a92a-47d2-9d7e-d873f4a60aa6",
+                                        "tourTitle": "Costa Rica Quest",
+                                        "tourType": "solo",
+                                        "mainImage": "/media/tours/main_images/1099ttcgy2021-bilbao-tt-1_gcxXVOW.webp",
+                                        "amount": "660.00",
+                                        "currency": "USD",
+                                        "status": "COMPLETED",
+                                        "tripStartDate": "2025-08-30",
+                                        "tripEndDate": "2026-06-27",
+                                        "createdAt": "2025-06-20T09:08:17.829470Z"
+                                    }
+                                ],
+                                "upcoming": [
+                                    {
+                                        "id": 3,
+                                        "uuid": "6ad5276f-a92a-47d2-9d7e-d873f4a60aa6",
+                                        "tourTitle": "Costa Rica Quest",
+                                        "tourType": "solo",
+                                        "mainImage": "/media/tours/main_images/1099ttcgy2021-bilbao-tt-1_gcxXVOW.webp",
+                                        "amount": "660.00",
+                                        "currency": "USD",
+                                        "status": "COMPLETED",
+                                        "tripStartDate": "2025-08-30",
+                                        "tripEndDate": "2026-06-27",
+                                        "createdAt": "2025-06-20T09:08:17.829470Z"
+                                    }
+                                ],
+                                "completed": [{
+                                        "id": 3,
+                                        "uuid": "6ad5276f-a92a-47d2-9d7e-d873f4a60aa6",
+                                        "tourTitle": "Costa Rica Quest",
+                                        "tourType": "solo",
+                                        "mainImage": "/media/tours/main_images/1099ttcgy2021-bilbao-tt-1_gcxXVOW.webp",
+                                        "amount": "660.00",
+                                        "currency": "USD",
+                                        "status": "COMPLETED",
+                                        "tripStartDate": "2025-08-30",
+                                        "tripEndDate": "2026-06-27",
+                                        "createdAt": "2025-06-20T09:08:17.829470Z"
+                                    }]
                             },
                             "wishlists": [
                                 {
@@ -178,7 +218,7 @@ class CustomerUserProfileView(APIView):
             trip_end_date__lte=today
         )
 
-        profile_data = CustomerUserProfileSerializer(user).data
+        profile_data = CustomerUserProfileSerializer(user)
         profile_data["bookings"] = {
             "all": TourBookingSerializer(all_bookings, many=True).data,
             "upcoming": TourBookingSerializer(upcoming_bookings, many=True).data,
