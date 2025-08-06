@@ -73,7 +73,7 @@ class TourDetailSerializer(serializers.ModelSerializer):
             'id','uuid', 'title', 'short_description', 'tour_type', 'duration', 'about', 'price', 'currency',
             'trip_start_date', 'trip_end_date', 'country', 'city', 'group_size', 'language',
             'age_min', 'age_max', 'partner', 'tags', 'main_image', 'created_at',
-            'images', 'itineraries', 'agepricing','excludedItem','includedItem','is_liked','trip_start_date','trip_end_date'
+            'images', 'itineraries', 'agepricing','excludedItem','includedItem','is_liked'
         ] 
     def get_is_liked(self, obj):
         return getattr(obj, 'is_liked', False)       

@@ -60,7 +60,7 @@ class TourListAPIView(generics.ListAPIView):
     ]
 
     def get_queryset(self):
-        queryset = Tour.objects.all() \
+        queryset = Tour.objects.filter(is_active=True) \
             .order_by('-created_at') \
             .prefetch_related('tags') \
             .select_related('country', 'city', 'tour_type')

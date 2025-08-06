@@ -54,7 +54,10 @@ class TourAdmin(admin.ModelAdmin):
     formfield_overrides = {
         MultiSelectField: {'widget': forms.SelectMultiple(attrs={'size': '4', 'style': 'width: 400px;'})},
     }
-    list_display = ('title', 'tour_type', 'duration', 'price', 'city', 'country', 'group_size', 'display_languages','author_name','display_tags')
+    list_display = ('title','is_active', 'tour_type', 'duration', 'price', 'city', 'country', 'group_size', 'display_languages','author_name','display_tags')
+    list_editable = ('is_active',) 
+    save_on_top = True
+    
     inlines = [
         TourPricingInline,
         TourImageInline,
