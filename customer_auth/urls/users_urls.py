@@ -29,5 +29,4 @@ urlpatterns = [
     path("ratetour/<uuid:tour_uuid>/rate/", SubmitRatingView.as_view(), name="submit-tour-rating"),
     path("payments/card/", CardBookingView.as_view(), name="card-booking"),
     path('payment-status/', PaymentStatusView.as_view(), name='payment-status'),
-
 ]

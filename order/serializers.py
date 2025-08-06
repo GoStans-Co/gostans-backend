@@ -7,7 +7,7 @@ from tours.models import Tour
 class TourSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Tour
-        fields = ['uuid', 'title', 'price', 'main_image', 'tour_type', 'duration','short_description']  # remove 'quantity'
+        fields = ['uuid', 'title', 'price', 'main_image', 'tour_type','duration','short_description']  # remove 'quantity'
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -90,6 +90,29 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = '__all__'
+
+
+class TourBookingSerializer(serializers.ModelSerializer):
+    tour_title = serializers.CharField(source='tour.title', read_only=True)
+    main_image = serializers.ImageField(source='tour.main_image', read_only=True)
+    tour_type = serializers.CharField(source='tour.tour_type', read_only=True)
+    uuid = serializers.UUIDField(source='tour.uuid', read_only=True)
+
+    class Meta:
+        model = TourBooking
+        fields = [
+            'id',
+            'uuid',
+            'tour_title',
+            'tour_type',
+            'main_image',
+            'amount',
+            'currency',
+            'status',
+            'trip_start_date',
+            'trip_end_date',
+            'created_at'
+        ]
 
 class CardholderInfoSerializer(serializers.ModelSerializer):
     class Meta:

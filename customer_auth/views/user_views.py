@@ -1,3 +1,5 @@
+from django.utils.timezone import now
+from datetime import date
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework import status,generics,permissions,parsers
@@ -17,8 +19,8 @@ from tours.models import Wishlist,Tour,TourAnalytics
 from tours.serializers import WishlistTourSerializer,RemovedWishlistItemSerializer
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import NotFound
-from order.models import Cart
-from order.serializers import AddToCartSerializer,CartItemSerializer,RemovedCartItemSerializer
+from order.models import Cart,TourBooking
+from order.serializers import AddToCartSerializer,CartItemSerializer,RemovedCartItemSerializer,TourBookingSerializer
 
 
 class WishlistPagination(PageNumberPagination):
@@ -130,6 +132,11 @@ class CustomerUserProfileView(APIView):
                             "date_joined": "2025-06-22 17:01",
                             "updated_at": "2025-06-22 17:01",
                             "is_verified": True,
+                            "bookings": {
+                                "all": [],
+                                "upcoming": [],
+                                "completed": []
+                            },
                             "wishlists": [
                                 {
                                     "uuid": "2f6b89bb-8309-4151-afda-0ec1d039878a",
@@ -157,10 +164,29 @@ class CustomerUserProfileView(APIView):
 
     def get(self, request):
         user = request.user
-        serializer = CustomerUserProfileSerializer(user)
+        today = date.today()
+
+        all_bookings = TourBooking.objects.filter(customer=user).select_related('tour')
+
+        upcoming_bookings = all_bookings.filter(
+            status="COMPLETED",
+            trip_start_date__gt=today
+        )
+
+        completed_bookings = all_bookings.filter(
+            status="COMPLETED",
+            trip_end_date__lte=today
+        )
+
+        profile_data = CustomerUserProfileSerializer(user).data
+        profile_data["bookings"] = {
+            "all": TourBookingSerializer(all_bookings, many=True).data,
+            "upcoming": TourBookingSerializer(upcoming_bookings, many=True).data,
+            "completed": TourBookingSerializer(completed_bookings, many=True).data
+        }
         return custom_response(
             statusCode=status.HTTP_200_OK,
-            data=serializer.data,
+            data=profile_data,
             message="Profile detail fetched sucessfully"
         )
 

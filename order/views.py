@@ -21,9 +21,15 @@ import json
 from django.db.models import F
 from paypalrestsdk import Sale, Refund
 from django.conf import settings
-from .payment_gateway import process_cybersource_payment, save_card_profile
+from .payment_gateway import process_cybersource_payment
+from rest_framework.response import Response
 
-
+import uuid
+import hmac
+import hashlib
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from datetime import datetime, timezone
 
 
 class CreatePaymentView(APIView):
@@ -49,6 +55,8 @@ class CreatePaymentView(APIView):
                 "amount": openapi.Schema(type=openapi.TYPE_NUMBER, format="float", description="Total payment amount"),
                 "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g. USD, EUR)", default="USD"),
                 "tourUuid": openapi.Schema(type=openapi.TYPE_STRING, format="uuid", description="UUID of the selected tour"),
+                "trip_start_date": openapi.Schema(type=openapi.TYPE_STRING, format="date", description="Trip start date (YYYY-MM-DD)"),
+                "trip_end_date": openapi.Schema(type=openapi.TYPE_STRING, format="date", description="Trip end date (YYYY-MM-DD)"),
                 "participants": openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     description="List of participants",
@@ -104,6 +112,8 @@ class CreatePaymentView(APIView):
         customer = request.user
         tour_uuid = request.data.get("tour_uuid")
         participants = request.data.get("participants", [])
+        trip_start_date_str = request.data.get("trip_start_date")
+        trip_end_date_str = request.data.get("trip_end_date")
 
         errors = {}
         if amount is None:
@@ -130,6 +140,25 @@ class CreatePaymentView(APIView):
 
         if not participants:
             errors["participants"] = "At least one participant is required."
+
+        date_format = "%Y-%m-%d"
+        trip_start_date = None
+        trip_end_date = None
+
+        try:
+            trip_start_date = datetime.strptime(trip_start_date_str, date_format).date()
+        except (ValueError, TypeError):
+            errors["trip_start_date"] = "Invalid or missing trip_start_date. Expected format: YYYY-MM-DD"
+
+        try:
+            trip_end_date = datetime.strptime(trip_end_date_str, date_format).date()
+        except (ValueError, TypeError):
+            errors["trip_end_date"] = "Invalid or missing trip_end_date. Expected format: YYYY-MM-DD"
+
+        
+        if "trip_start_date" not in errors and "trip_end_date" not in errors:
+            if trip_start_date > trip_end_date:
+                errors["trip_dates"] = "trip_start_date cannot be after trip_end_date"
 
         if errors:
             return custom_response(
@@ -162,8 +191,8 @@ class CreatePaymentView(APIView):
                     amount=amount,
                     currency=currency,
                     status="PENDING", #this column for booking status ,"pending" as initiating payment 
-                    trip_start_date=tour.trip_start_date,
-                    trip_end_date=tour.trip_end_date,
+                    trip_start_date=trip_start_date,
+                    trip_end_date=trip_end_date,
                     country=tour.country,
                     city=tour.city
                 )
@@ -291,8 +320,6 @@ class ExecutePaymentView(APIView):
     def post(self, request):
         payment_id = request.data.get("payment_id")
         payer_id = request.data.get("payer_id")
-        print(f"Received paymentId : {request.data} ")
-
         errors = {} 
         if not payment_id:
             errors["paymentId"] = "This field is required."
@@ -630,14 +657,16 @@ class CardBookingView(APIView):
         print("🔔 Received booking request via card")
         user = request.user
         data = request.data
-        print("📦 Incoming Data:", data)
-        amount = data.get("amount")
-        currency = data.get("currency", "USD")
+        billings = data.get("order_information")
+        
+        amountDetails = billings.get("amount_details")
+        amount=amountDetails["total_amount"]
+        currency = amountDetails["currency"]
         participants = data.get("participants", [])
-        tour_uuid = data.get("tour_uuid")
-        card_info = data.get("card_info")
-        billing_info = data.get("billing_info")
-
+        tour_uuid = amountDetails.get("tour_uuid") 
+        # card_info = data.get("card_info")
+        
+        billing=billings.get("billing_info")
         errors = {}
 
         #  Amount validation
@@ -665,13 +694,13 @@ class CardBookingView(APIView):
             errors["tourUuid"] = "Tour not found or invalid UUID."
 
         #  Participant validation
-        if not participants:
-            errors["participants"] = "At least one participant is required."
-        else:
-            for idx, p in enumerate(participants):
-                missing = [k for k in ("first_name", "last_name", "id_type", "id_number", "date_of_birth") if not p.get(k)]
-                if missing:
-                    errors[f"participant_{idx+1}"] = f"Missing: {', '.join(missing)}"
+        # if not participants:
+        #     errors["participants"] = "At least one participant is required."
+        # else:
+        #     for idx, p in enumerate(participants):
+        #         missing = [k for k in ("first_name", "last_name", "id_type", "id_number", "date_of_birth") if not p.get(k)]
+        #         if missing:
+        #             errors[f"participant_{idx+1}"] = f"Missing: {', '.join(missing)}"
 
         if errors:
             return custom_response(
@@ -686,8 +715,7 @@ class CardBookingView(APIView):
             payment_response = process_cybersource_payment(
                 amount=amount_val,
                 currency=currency.upper(),
-                card=card_info,
-                billing=billing_info
+                billing=billing
             )
             print("Payment response from CyberSource:", payment_response)
         except Exception as e:
@@ -845,3 +873,4 @@ class PaymentStatusView(APIView):
                 "currency": payment.currency
             }
         })
+    
