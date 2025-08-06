@@ -116,6 +116,10 @@ class Tour(models.Model):
     trending_score = models.FloatField(default=0.0, help_text="Calculated score for trending algorithm")
     destination = models.ForeignKey(Destination, on_delete=models.SET_NULL, null=True, blank=True, related_name='tours')
 
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Mark tour as active or inactive"
+    )
 
     def get_price(self, age_category='adult'):
         if self.use_detailed_pricing:
