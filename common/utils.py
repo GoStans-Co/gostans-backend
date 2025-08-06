@@ -21,7 +21,7 @@ def get_coordinates(location_name):
     params = {'address': location_name, 'key': api_key}
     response = requests.get(endpoint, params=params)
 
-    if response.statusCode == 200:
+    if response.status_code == 200:  # ✅ Correct attribute
         results = response.json().get('results')
         if results:
             loc = results[0]['geometry']['location']
