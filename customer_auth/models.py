@@ -24,7 +24,7 @@ class CustomerUser(models.Model):
     is_active = models.BooleanField(default=True) 
     date_joined = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    image = models.ImageField(upload_to=user_directory_path, null=True, blank=True)  # add on field
+    image = models.ImageField(upload_to=user_directory_path,max_length=500, null=True, blank=True)  # add on field
 
     oauth_id = models.CharField(max_length=255, blank=True, null=True, verbose_name=_("OAuth ID"))
     oauth_provider = models.CharField(max_length=50, blank=True, null=True, verbose_name=_("OAuth Provider"))
@@ -45,7 +45,7 @@ class CustomerUser(models.Model):
 class CustomerOTP(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone = models.CharField(max_length=15, db_index=True)
-    otp = models.CharField(max_length=4)
+    otp = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
     is_verified = models.BooleanField(default=False)
     expires_at = models.DateTimeField()
