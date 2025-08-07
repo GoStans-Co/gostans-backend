@@ -218,7 +218,7 @@ class CustomerUserProfileView(APIView):
             trip_end_date__lte=today
         )
 
-        profile_data = CustomerUserProfileSerializer(user)
+        profile_data = CustomerUserProfileSerializer(user).data
         profile_data["bookings"] = {
             "all": TourBookingSerializer(all_bookings, many=True).data,
             "upcoming": TourBookingSerializer(upcoming_bookings, many=True).data,
