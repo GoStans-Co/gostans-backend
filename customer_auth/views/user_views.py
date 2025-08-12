@@ -862,7 +862,7 @@ class OrderDetailView(APIView):
 
     @swagger_auto_schema(
         operation_description="Get detailed order info by booking ID",
-        tags=["Order"],
+        tags=["Auth Controller"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
