@@ -52,15 +52,20 @@ class BookingParticipantSerializer(serializers.ModelSerializer):
         model = BookingParticipant
         fields = ['first_name', 'last_name', 'id_type', 'id_number', 'date_of_birth']
 
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        # fields = ['payment_id', 'amount', 'currency', 'status', 'payment_method', 'created_at']
+        fields = '__all__'
+
 
 class TourBookingCreateSerializer(serializers.ModelSerializer):
     participants = BookingParticipantSerializer(many=True)
-
     class Meta:
         model = TourBooking
         fields = [
             'tour', 'payment_id', 'amount', 'currency', 'trip_start_date',
-            'trip_end_date', 'participants'
+            'trip_end_date','participants'
         ]
 
     def validate(self, data):
@@ -86,10 +91,6 @@ class TourBookingCreateSerializer(serializers.ModelSerializer):
         return booking
     
 
-class PaymentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Payment
-        fields = '__all__'
 
 
 class TourBookingSerializer(serializers.ModelSerializer):
@@ -97,6 +98,8 @@ class TourBookingSerializer(serializers.ModelSerializer):
     main_image = serializers.ImageField(source='tour.main_image', read_only=True)
     tour_type = serializers.CharField(source='tour.tour_type', read_only=True)
     uuid = serializers.UUIDField(source='tour.uuid', read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
+    participants = BookingParticipantSerializer(many=True)
 
     class Meta:
         model = TourBooking
@@ -111,7 +114,9 @@ class TourBookingSerializer(serializers.ModelSerializer):
             'status',
             'trip_start_date',
             'trip_end_date',
-            'created_at'
+            'created_at',
+            'payments',
+            'participants'
         ]
 
 

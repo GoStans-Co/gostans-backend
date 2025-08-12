@@ -6,13 +6,14 @@ from customer_auth.views import (
     
 )
 from customer_auth.views.user_views import (
-    AddToCartAPIView,RemoveFromCartAPIView,CartListAPIView
+    AddToCartAPIView,RemoveFromCartAPIView,CartListAPIView,OrderDetailView
 )
 
 from order.views import(CreatePaymentView,ExecutePaymentView,PayPalWebhookView,CancelBookingView,CardBookingView,PaymentStatusView)
 from tours.views import(SubmitRatingView)
 
 urlpatterns = [
+    path('booking-detail/',OrderDetailView.as_view(),name='booking-detail'),
     path('profile/', CustomerUserProfileView.as_view(), name='customer-profile'),
     path('update/', CustomerUserUpdateView.as_view(), name='user-update'),
     path('update-image/', CustomerUserImageUpdateView.as_view(), name='customer-image-update'),

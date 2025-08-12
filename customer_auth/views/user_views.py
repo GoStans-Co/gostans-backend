@@ -20,7 +20,7 @@ from tours.serializers import WishlistTourSerializer,RemovedWishlistItemSerializ
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import NotFound
 from order.models import Cart,TourBooking
-from order.serializers import AddToCartSerializer,CartItemSerializer,RemovedCartItemSerializer,TourBookingSerializer
+from order.serializers import AddToCartSerializer,CartItemSerializer,RemovedCartItemSerializer,TourBookingSerializer,BookingParticipantSerializer,PaymentSerializer
 
 
 class WishlistPagination(PageNumberPagination):
@@ -849,3 +849,106 @@ class CartListAPIView(generics.ListAPIView):
         )
     
 
+
+# api for order api detail
+class OrderDetailView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    booking_id_param = openapi.Parameter(
+        'booking_id', openapi.IN_BODY, description="Booking ID to fetch details", type=openapi.TYPE_INTEGER, required=True
+    )
+
+    @swagger_auto_schema(
+        operation_description="Get detailed order info by booking ID",
+        tags=["Order"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'booking_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='Booking ID'),
+            },
+            required=['booking_id']
+        ),
+        responses={
+            200: openapi.Response(
+                description="Order detail fetched successfully",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "Order detail fetched successfully",
+                        "data": {
+                            "id": 5,
+                            "uuid": "60806051-d3d6-4555-86d5-13652401791f",
+                            "tourTitle": "Cultural Wonders of Kyoto",
+                            "tourType": None,
+                            "mainImage": "/media/tours/main_images/view-madrid-spain-1_CLNF3pD_lkNl6wn_Oct96My.webp",
+                            "amount": "7079.84",
+                            "currency": "USD",
+                            "status": "CANCELLED",
+                            "tripStartDate": None,
+                            "tripEndDate": None,
+                            "createdAt": "2025-07-06T12:16:31.237630Z",
+                            "payments": [
+                                {
+                                    "id": 2,
+                                    "paymentId": "PAYID-NBVGSIA70691654T7165104W",
+                                    "amount": "7079.84",
+                                    "currency": "USD",
+                                    "status": "FAILED",
+                                    "paymentMethod": "paypal",
+                                    "payerId": None,
+                                    "createdAt": "2025-07-06T12:16:31.263787Z",
+                                    "updatedAt": "2025-07-06T12:16:31.263847Z",
+                                    "details": None,
+                                    "booking": 5
+                                }
+                            ],
+                            "participants": [
+                                {
+                                    "firstName": "Alice",
+                                    "lastName": "Smith",
+                                    "idType": "Passport",
+                                    "idNumber": "A12345678",
+                                    "dateOfBirth": "1990-05-15"
+                                },
+                                {
+                                    "firstName": "Bob",
+                                    "lastName": "Johnson",
+                                    "idType": "National ID",
+                                    "idNumber": "ID987654321",
+                                    "dateOfBirth": "1985-10-30"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ),
+            404: openapi.Response(description="Booking not found"),
+            400: openapi.Response(description="Bad request")
+        }
+    )
+    def post(self, request):
+        booking_id = request.data.get('booking_id')
+        if not booking_id:
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="booking_id is required",
+                data={}
+            )
+
+        booking = get_object_or_404(
+            TourBooking.objects.select_related('tour', 'customer', 'partner', 'country', 'city')
+            .prefetch_related('participants', 'payments'),
+            id=booking_id,
+            customer=request.user
+        )
+
+        serializer = TourBookingSerializer(booking)
+        return custom_response(
+            statusCode=status.HTTP_200_OK,
+            data=serializer.data,
+            message="Order detail fetched successfully"
+        )
+
+       
