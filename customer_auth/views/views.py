@@ -24,6 +24,8 @@ from drf_yasg import openapi
 from django.core.cache import cache
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
+from twilio.rest import Client
+from django.conf import settings
 
 
 
@@ -182,6 +184,7 @@ class CheckEmailExistsView(APIView):
         exists = CustomerUser.objects.filter(email=email).exists()
         return Response({'email_exists': exists}, status=status.HTTP_200_OK)
 
+#User didn't receive the verification email during signup.
 class ResendVerificationEmailView(APIView):
 
     @swagger_auto_schema(
@@ -224,7 +227,7 @@ class ResendVerificationEmailView(APIView):
         except CustomerUser.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
  
-
+# The user clicks the link in their email, and then this api would be called
 class VerifyEmailView(APIView):
     @swagger_auto_schema(
         operation_description="Verify user email using token from email link.",
@@ -459,8 +462,10 @@ class GoogleSignupAPIView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
         
 
+#send otp on phone
 class SendOTPView(APIView):
     @swagger_auto_schema(
+        operation_summary="send OTP on mobile number",
         operation_description="Send OTP to the provided phone number. No authentication required.",
         tags=["Auth Controller"],
         request_body=SendOTPSerializer,
@@ -514,20 +519,37 @@ class SendOTPView(APIView):
                 'expires_at': expires_at
             }
         )
+        
+        try:
+            client = Client(
+                settings.TWILIO_ACCOUNT_SID,
+                settings.TWILIO_AUTH_TOKEN
+            )
 
-        # Here, just print OTP for demo
-        print(f"Sending OTP {otp_code} to {phone}")
+            message = client.messages.create(
+                body=f"Your OTP is {otp_code}. It will expire in 5 minutes.",
+                from_=settings.TWILIO_PHONE_NUMBER,
+                to=phone
+            )
+
+        except Exception as e:
+            return custom_response(
+                statusCode=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Failed to send OTP via SMS",
+                data={"error": str(e)}
+            )
 
         return custom_response(
             statusCode=status.HTTP_200_OK,
-            data={"otp": otp_code},
+            data={"phone": phone},
             message="OTP sent successfully"
         )
     
-
+#verify otp of phone number
 class VerifyOTPView(APIView):
     
     @swagger_auto_schema(
+        operation_summary="Verify OTP sent on mobile",
         operation_description="Verify otp.",
         tags=["Auth Controller"],
         request_body=VerifyOTPSerializer,
@@ -646,6 +668,7 @@ class ForgotPasswordView(APIView):
 
         return custom_response(statusCode=status.HTTP_200_OK, message="OTP sent to your email")
 
+#resend otp on email
 class ResendOTPView(APIView):
     @swagger_auto_schema(
         operation_summary="Resend OTP for password reset",
@@ -714,6 +737,7 @@ class ResendOTPView(APIView):
         send_otp_email(email, otp,name=user.name or "User")
         return custom_response(statusCode=status.HTTP_200_OK, message="OTP resent to your email")
 
+# verify otp on email
 class VerifyOTPEmailView(APIView):
     @swagger_auto_schema(
         operation_summary="Verify OTP for password reset",
@@ -786,7 +810,7 @@ class VerifyOTPEmailView(APIView):
 
         return custom_response(statusCode=status.HTTP_200_OK, message="OTP verified successfully")
 
-
+#resest password
 class ResetPasswordView(APIView):
     @swagger_auto_schema(
         operation_summary="Reset user password",
