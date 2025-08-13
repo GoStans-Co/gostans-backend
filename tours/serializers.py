@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Tour, TourTag, TourType,TourImage,Itinerary,TourPricing,Wishlist,ExcludedItem,IncludedItem,TourRating,Destination
 from location.models import Country,City
+
 class TourTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = TourTag
@@ -166,3 +167,13 @@ class TrendingTourSerializer(serializers.ModelSerializer):
 
     def get_is_liked(self, obj):
         return getattr(obj, 'is_liked', False)
+
+
+class UpdateTourLocationSerializer(serializers.Serializer):
+    tour_uuid = serializers.UUIDField()
+    days = serializers.DictField(
+        child=serializers.DictField(
+            child=serializers.DecimalField(max_digits=9, decimal_places=6)
+        ),
+        required=True
+    )
