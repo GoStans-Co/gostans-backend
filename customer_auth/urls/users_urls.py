@@ -9,8 +9,18 @@ from customer_auth.views.user_views import (
     AddToCartAPIView,RemoveFromCartAPIView,CartListAPIView,OrderDetailView
 )
 
-from order.views import(CreatePaymentView,ExecutePaymentView,PayPalWebhookView,CancelBookingView,CardBookingView,PaymentStatusView)
+from order.views import(
+    CreatePaymentView,
+    ExecutePaymentView,
+    PayPalWebhookView,
+    CancelBookingView,
+    CardBookingView,
+    PaymentStatusView,
+    CreateStripePaymentView,
+    stripe_webhook
+    )
 from tours.views import(SubmitRatingView)
+
 
 urlpatterns = [
     path('booking-detail/',OrderDetailView.as_view(),name='booking-detail'),
@@ -30,4 +40,7 @@ urlpatterns = [
     path("ratetour/<uuid:tour_uuid>/rate/", SubmitRatingView.as_view(), name="submit-tour-rating"),
     path("payments/card/", CardBookingView.as_view(), name="card-booking"),
     path('payment-status/', PaymentStatusView.as_view(), name='payment-status'),
+    path('create-payment-intent/', CreateStripePaymentView.as_view(), name="create-payment-intent"),
+    path('stripe-webhook/', stripe_webhook, name="stripe-webhook"),
+
 ]

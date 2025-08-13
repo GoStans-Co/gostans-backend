@@ -28,9 +28,13 @@ import uuid
 import hmac
 import hashlib
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timezone
+import stripe
+from django.conf import settings
 
+from django.http import HttpResponse
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class CreatePaymentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -874,3 +878,181 @@ class PaymentStatusView(APIView):
             }
         })
     
+
+
+#stripe payment
+
+class CreateStripePaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomerUserJWTAuthentication]
+
+    @swagger_auto_schema(
+        operation_description="Initiate a Stripe card payment for a tour booking.",
+        tags=["User Controller"],
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description='JWT Token in format: Bearer <token>',
+                required=True
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["amount", "tourUuid", "participants"],
+            properties={
+                "amount": openapi.Schema(type=openapi.TYPE_NUMBER, format="float"),
+                "currency": openapi.Schema(type=openapi.TYPE_STRING, default="USD"),
+                "tourUuid": openapi.Schema(type=openapi.TYPE_STRING, format="uuid"),
+                "trip_start_date": openapi.Schema(type=openapi.TYPE_STRING, format="date"),
+                "trip_end_date": openapi.Schema(type=openapi.TYPE_STRING, format="date"),
+                "participants": openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Items(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "first_name": openapi.Schema(type=openapi.TYPE_STRING),
+                            "last_name": openapi.Schema(type=openapi.TYPE_STRING),
+                            "id_type": openapi.Schema(type=openapi.TYPE_STRING),
+                            "id_number": openapi.Schema(type=openapi.TYPE_STRING),
+                            "date_of_birth": openapi.Schema(type=openapi.TYPE_STRING, format="date")
+                        },
+                        required=["first_name", "last_name", "id_type", "id_number", "date_of_birth"]
+                    )
+                )
+            }
+        ),
+        responses={200: openapi.Response(description="Payment created successfully")}
+    )
+    def post(self, request):
+        amount = request.data.get("amount")
+        currency = request.data.get("currency", "USD")
+        tour_uuid = request.data.get("tour_uuid")
+        participants = request.data.get("participants", [])
+        trip_start_date_str = request.data.get("trip_start_date")
+        trip_end_date_str = request.data.get("trip_end_date")
+        customer = request.user
+
+        errors = {}
+        if amount is None or float(amount) <= 0:
+            errors["amount"] = "Amount must be greater than zero."
+        
+        # if not participants:
+        #     errors["participants"] = "At least one participant is required."
+
+        try:
+            tour = Tour.objects.get(uuid=tour_uuid)
+        except:
+            errors["tourUuid"] = "Tour not found or invalid UUID."
+
+        date_format = "%Y-%m-%d"
+        try:
+            trip_start_date = datetime.strptime(trip_start_date_str, date_format).date()
+        except:
+            trip_start_date = None
+        try:
+            trip_end_date = datetime.strptime(trip_end_date_str, date_format).date()
+        except:
+            trip_end_date = None
+
+        if errors:
+            return Response({"status": 400, "message": "Validation failed", "data": errors})
+
+        # Create Stripe PaymentIntent
+        try:
+            intent = stripe.PaymentIntent.create(
+                amount=int(float(amount)*100),
+                currency=currency.lower(),
+                payment_method_types=["card"],
+                metadata={"tour_uuid": str(tour_uuid), "customer_id": str(customer.id)}
+            )
+        except Exception as e:
+            return Response({"status": 400, "message": "Stripe PaymentIntent creation failed", "data": str(e)})
+
+        with transaction.atomic():
+            booking = TourBooking.objects.create(
+                customer=customer,
+                partner=tour.partner,
+                tour=tour,
+                payment_id=intent.id,
+                amount=amount,
+                currency=currency,
+                status="PENDING",
+                trip_start_date=trip_start_date,
+                trip_end_date=trip_end_date,
+                country=tour.country,
+                city=tour.city
+            )
+            Payment.objects.create(
+                booking=booking,
+                payment_id=intent.id,
+                amount=amount,
+                currency=currency,
+                status="PENDING",
+                payment_method="stripe"
+            )
+
+            for p in participants:
+                BookingParticipant.objects.create(
+                    booking=booking,
+                    first_name=p["first_name"],
+                    last_name=p["last_name"],
+                    id_type=p["id_type"],
+                    id_number=p["id_number"],
+                    date_of_birth=p["date_of_birth"]
+                )
+
+       
+
+        return Response({
+            "statusCode": 200,
+            "message": "Payment created successfully",
+            "data": {
+                "bookingId": booking.id,
+                "client_secret": intent.client_secret,
+                "paymentId": intent.id
+            }
+        })
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    endpoint_secret = settings.STRIPE_WEBHOOK_SECRET  # set in settings
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+    except Exception as e:
+        return HttpResponse(status=400)
+
+    if event['type'] == 'payment_intent.succeeded':
+        intent = event['data']['object']
+        try:
+            payment = Payment.objects.get(payment_id=intent['id'])
+            payment.status = "COMPLETED"
+            payment.details = intent
+            payment.save()
+
+            booking = TourBooking.objects.get(payment_id=intent['id'])
+            booking.status = "COMPLETED"
+            booking.save()
+        except Payment.DoesNotExist:
+            pass
+
+    elif event['type'] == 'payment_intent.payment_failed':
+        intent = event['data']['object']
+        try:
+            payment = Payment.objects.get(payment_id=intent['id'])
+            payment.status = "FAILED"
+            payment.details = intent
+            payment.save()
+
+            booking = TourBooking.objects.get(payment_id=intent['id'])
+            booking.status = "FAILED"
+            booking.save()
+        except Payment.DoesNotExist:
+            pass
+
+    return HttpResponse(status=200)
