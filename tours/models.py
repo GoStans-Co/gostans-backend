@@ -151,13 +151,11 @@ class Tour(models.Model):
         return list(self.tags.values_list('slug', flat=True))
 
     @property
-    def duration_display(self):
-        # Convert '1 day', '2 day' etc. to integer
+    def duration_days(self):
         try:
-            days = int(self.duration.split()[0])
+            return int(self.duration.split()[0])  # get "1" from "1 day"
         except (ValueError, IndexError):
-            days = 1
-        return f"{days} Day{'s' if days > 1 else ''}"
+            return None
 
 class TourImage(models.Model):
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='images')
