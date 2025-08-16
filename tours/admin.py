@@ -97,8 +97,8 @@ class TourAdmin(admin.ModelAdmin):
 
     def duration_display(self, obj):
         try:
-            days = int(obj.duration.split()[0])
-        except (ValueError, IndexError):
+            days = int(obj.duration) if obj.duration else 1
+        except (ValueError, TypeError):
             days = 1
         return f"{days} Day{'s' if days > 1 else ''}"
     duration_display.admin_order_field = 'duration'
