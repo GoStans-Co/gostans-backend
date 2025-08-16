@@ -152,10 +152,8 @@ class Tour(models.Model):
 
     @property
     def duration_days(self):
-        try:
-            return int(self.duration.split()[0])  # get "1" from "1 day"
-        except (ValueError, IndexError):
-            return None
+        return self.duration or None
+
 
 class TourImage(models.Model):
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='images')
