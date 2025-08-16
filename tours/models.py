@@ -71,12 +71,14 @@ class Tour(models.Model):
         ('uz', 'Uzbek'),
         ('ko', 'Korean'),
     ]
-
+    
     DURATION_CHOICES = [(f'{i} day', f'{i} Day{"s" if i > 1 else ""}') for i in range(1, 8)]
     title = models.CharField(max_length=255)
     short_description = models.TextField(max_length=300)
     tour_type = models.ForeignKey(TourType, on_delete=models.SET_NULL, null=True)
-    duration = models.CharField(max_length=10, choices=DURATION_CHOICES)
+    # duration = models.CharField(max_length=10, choices=DURATION_CHOICES)
+    duration = models.PositiveIntegerField(help_text="Enter number of days for the tour")
+
     about = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(
@@ -147,6 +149,15 @@ class Tour(models.Model):
     @property
     def tag_list(self):
         return list(self.tags.values_list('slug', flat=True))
+
+    @property
+    def duration_display(self):
+        # Convert '1 day', '2 day' etc. to integer
+        try:
+            days = int(self.duration.split()[0])
+        except (ValueError, IndexError):
+            days = 1
+        return f"{days} Day{'s' if days > 1 else ''}"
 
 class TourImage(models.Model):
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='images')

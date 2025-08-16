@@ -54,7 +54,9 @@ class TourAdmin(admin.ModelAdmin):
     formfield_overrides = {
         MultiSelectField: {'widget': forms.SelectMultiple(attrs={'size': '4', 'style': 'width: 400px;'})},
     }
-    list_display = ('title','is_active', 'tour_type', 'duration', 'price', 'city', 'country', 'group_size', 'display_languages','author_name','display_tags')
+
+    # Use duration_display instead of raw duration
+    list_display = ('title','is_active', 'tour_type', 'duration_display', 'price', 'city', 'country', 'group_size', 'display_languages','author_name','display_tags')
     list_editable = ('is_active',) 
     save_on_top = True
     
@@ -65,6 +67,7 @@ class TourAdmin(admin.ModelAdmin):
         ExcludedItemInline,
         ItineraryInline,  # include itinerary inline here too
     ]
+
     fieldsets = (
         (None, {
             'fields': (
@@ -75,11 +78,11 @@ class TourAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ['main_image_preview']
+
     def main_image_preview(self, obj):
         if obj.main_image:
             return format_html('<img src="{}" style="height: 150px; margin: 5px;" />', obj.main_image.url)
         return "(No image)"
-
     main_image_preview.short_description = 'Main Image Preview'
 
     def display_tags(self, obj):
@@ -91,7 +94,15 @@ class TourAdmin(admin.ModelAdmin):
             return obj.partner.user.get_full_name() or obj.partner.user.username
         return "N/A"
     author_name.short_description = "Author"
-    
+
+    def duration_display(self, obj):
+        try:
+            days = int(obj.duration.split()[0])
+        except (ValueError, IndexError):
+            days = 1
+        return f"{days} Day{'s' if days > 1 else ''}"
+    duration_display.admin_order_field = 'duration'
+    duration_display.short_description = 'Duration'
 
     def display_languages(self, obj):
         return ", ".join(obj.language)
@@ -102,25 +113,20 @@ class TourAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         try:
-            partner_profile = request.user.partner_profile  # note underscore here
+            partner_profile = request.user.partner_profile
         except PartnerProfile.DoesNotExist:
             return qs.none()
         return qs.filter(partner=partner_profile)
 
     def has_change_permission(self, request, obj=None):
         if obj is None:
-            # Return True or False depending on whether the user can view the list at all.
-            # Usually, partners can see their own tours, so allow.
             return True
         if not hasattr(request.user, 'partner_profile'):
             return False
         return obj.partner == request.user.partner_profile
 
-
     def has_delete_permission(self, request, obj=None):
-        if obj is None:
-            return True
-        if request.user.is_superuser:
+        if obj is None or request.user.is_superuser:
             return True
         try:
             return obj.partner == request.user.partner_profile
@@ -134,19 +140,17 @@ class TourAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change:
             if request.user.is_superuser:
-                # Assign the dummy PartnerProfile for superuser
                 dummy_partner = PartnerProfile.objects.filter(user=request.user).first()
                 if not dummy_partner:
                     raise ValidationError("Superuser does not have a dummy PartnerProfile. Please create one.")
                 obj.partner = dummy_partner
             else:
-                # Assign the logged-in partner's profile
                 try:
                     obj.partner = request.user.partner_profile
                 except PartnerProfile.DoesNotExist:
                     raise ValidationError("You do not have a partner profile to assign.")
-
         super().save_model(request, obj, form, change)
+
 
 @admin.register(TourTag)
 class TourTagAdmin(admin.ModelAdmin):
