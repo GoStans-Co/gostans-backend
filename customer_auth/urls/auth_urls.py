@@ -13,6 +13,7 @@ from customer_auth.views import (
     CheckEmailExistsView,
     ResendVerificationEmailView,
     VerifyEmailView,
+    OAuthExchangeAPIView,
 )
 
 urlpatterns = [
@@ -28,5 +29,6 @@ urlpatterns = [
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('check-email/', CheckEmailExistsView.as_view(), name='check_email'),
     path('resend-verification-email/', ResendVerificationEmailView.as_view(), name='check_email'),
-    path('verify-email/', VerifyEmailView.as_view(), name='verify-email')
+    path('verify-email/', VerifyEmailView.as_view(), name='verify-email'),
+    path("oauth/exchange/", OAuthExchangeAPIView.as_view(), name="oauth-exchange"),
 ]

@@ -11,6 +11,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from google.auth.transport import requests as google_requests
+
 import random
 import string
 from django.utils.crypto import get_random_string
@@ -26,6 +28,8 @@ from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from twilio.rest import Client
 from django.conf import settings
+
+
 
 
 
@@ -854,3 +858,147 @@ class ResetPasswordView(APIView):
         cache.delete(f"otp:{email}")
 
         return custom_response(statusCode=status.HTTP_200_OK, message="Password reset successful")
+
+#new oath exchange api
+class OAuthExchangeAPIView(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Exchange authorization code for tokens and login/signup user with Google OAuth2.",
+        tags=["Auth Controller"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["provider", "authorization_code", "redirect_uri"],
+            properties={
+                "provider": openapi.Schema(type=openapi.TYPE_STRING, example="google"),
+                "authorization_code": openapi.Schema(type=openapi.TYPE_STRING, example="abcd......"),
+                "redirect_uri": openapi.Schema(type=openapi.TYPE_STRING, example="http://localhost:5173/oauth2/redirect"),
+            },
+        ),
+        responses={
+            200: openapi.Response(
+                description="Signup/Login successful",
+                examples={
+                    "application/json": {
+                        "statusCode": 200,
+                        "message": "Login successful",
+                        "data": {
+                            "id": 1,
+                            "email": "user@example.com",
+                            "name": "John Doe",
+                            "phone": None,
+                            "oauth_id": "google-oauth-id",
+                            "oauth_provider": "GOOGLE",
+                            "refresh": "refresh-token-string",
+                            "access_token": "access-token-string",
+                            "imageURL": "https://lh3.googleusercontent.com/a-/AOh14Gh...",
+                            "oauthProvider": "GOOGLE",
+                            "oauthId": "google-oauth-id",
+                            "providerId": "google-oauth-id"
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid request or failed exchange",
+                examples={
+                    "application/json": {
+                        "statusCode": 400,
+                        "message": "Failed to exchange code",
+                        "data": {}
+                    }
+                }
+            ),
+        },
+    )
+    
+    def post(self, request):
+        provider = request.data.get("provider")
+        code = request.data.get("authorization_code")
+        redirect_uri = request.data.get("redirect_uri")
+
+        if provider != "google":
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Only Google OAuth is supported",
+                data={}
+            )
+
+        try:
+            # 1. Exchange authorization code for access_token + id_token
+            token_url = "https://oauth2.googleapis.com/token"
+            payload = {
+                "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            }
+            token_resp = requests.post(token_url, data=payload)
+            token_data = token_resp.json()
+
+            if "id_token" not in token_data:
+                return Response(
+                    {"message": "Failed to exchange code", "data": token_data, "statusCode": 400},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            id_token_str = token_data["id_token"]
+
+            # 2. Verify ID token
+            idinfo = id_token.verify_oauth2_token(
+                id_token_str, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+            )
+
+            email = idinfo.get("email")
+            first_name = idinfo.get("given_name", "")
+            last_name = idinfo.get("family_name", "")
+            name = f"{first_name} {last_name}".strip()
+            image = idinfo.get("picture", "")
+            oauth_id = idinfo.get("sub")
+
+            # 3. Find or create user
+            user, created = CustomerUser.objects.get_or_create(
+                email=email,
+                defaults={
+                    "name": name or email.split("@")[0],
+                    "oauth_id": oauth_id,
+                    "oauth_provider": "GOOGLE",
+                    "image": image,
+                    "password": get_random_string(length=32),
+                },
+            )
+
+            if created:
+                send_welcome_email(user)
+
+            # 4. Generate JWT
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            return Response(
+                {
+                    "message": "Signup successful" if created else "Login successful",
+                    "data": {
+                        "id": user.id,
+                        "email": user.email,
+                        "name": user.name,
+                        "phone": user.phone,
+                        "oauth_id": user.oauth_id,
+                        "oauth_provider": user.oauth_provider,
+                        "refresh": str(refresh),
+                        "access_token": access_token,
+                        "imageURL": image,
+                        "oauthProvider": "GOOGLE",
+                        "oauthId": oauth_id,
+                        "providerId": oauth_id,
+                    },
+                    "statusCode": 200,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"message": "OAuth exchange failed", "error": str(e), "statusCode": 400},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

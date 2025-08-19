@@ -6,7 +6,7 @@ from .views import (
     GoogleSignupAPIView,
     SendOTPView,
     VerifyOTPView,ForgotPasswordView,ResendOTPView,VerifyOTPEmailView,ResetPasswordView,
-    CheckEmailExistsView,ResendVerificationEmailView,VerifyEmailView
+    CheckEmailExistsView,ResendVerificationEmailView,VerifyEmailView,OAuthExchangeAPIView
 
 )
 
