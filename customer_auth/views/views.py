@@ -995,9 +995,22 @@ class OAuthExchangeAPIView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-
         except Exception as e:
+            import traceback
+            logger.error(traceback.format_exc())
             return Response(
-                {"message": "OAuth exchange failed", "error": str(e), "statusCode": 400},
+                {
+                    "message": "OAuth exchange failed",
+                    "error": str(e),
+                    "statusCode": 400,
+                    "token_data": token_data if 'token_data' in locals() else None
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+#         https://accounts.google.com/o/oauth2/v2/auth?
+# client_id=952651293760-udu8kntqm3u21a5ubmbtk5r61r60avol.apps.googleusercontent.com&
+# redirect_uri=http://localhost:5173/oauth2/redirect&
+# response_type=code&
+# scope=openid%20email%20profile&
+# access_type=offline
