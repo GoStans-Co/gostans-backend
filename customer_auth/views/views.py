@@ -1,3 +1,5 @@
+import requests
+
 from rest_framework import status,generics,permissions,parsers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,8 +12,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from google.oauth2 import id_token
-from google.auth.transport import requests
-from google.auth.transport import requests as google_requests
+from google.auth.transport.requests import Request
 
 import random
 import string
@@ -28,8 +29,7 @@ from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from twilio.rest import Client
 from django.conf import settings
-
-
+from google.auth.transport.requests import Request
 
 
 
@@ -910,7 +910,6 @@ class OAuthExchangeAPIView(APIView):
             ),
         },
     )
-    
     def post(self, request):
         provider = request.data.get("provider")
         code = request.data.get("authorization_code")
@@ -946,7 +945,7 @@ class OAuthExchangeAPIView(APIView):
 
             # 2. Verify ID token
             idinfo = id_token.verify_oauth2_token(
-                id_token_str, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+                id_token_str, Request(), settings.GOOGLE_CLIENT_ID
             )
 
             email = idinfo.get("email")
@@ -982,7 +981,7 @@ class OAuthExchangeAPIView(APIView):
                         "id": user.id,
                         "email": user.email,
                         "name": user.name,
-                        "phone": user.phone,
+                        "phone": getattr(user, "phone", ""),
                         "oauth_id": user.oauth_id,
                         "oauth_provider": user.oauth_provider,
                         "refresh": str(refresh),
