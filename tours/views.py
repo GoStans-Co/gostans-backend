@@ -164,10 +164,6 @@ class TourDetailAPIView(RetrieveAPIView):
     lookup_field = 'uuid'  # default is 'pk', you can use 'id' if you prefer
     lookup_url_kwarg = 'tour_uuid'
 
-    # queryset = Tour.objects.all().prefetch_related(
-    #     'tags', 'images', 'itineraries', 'age_pricing'
-    # ).select_related('country', 'city', 'tour_type')
-    
     def get_queryset(self):
         base_queryset = Tour.objects.all().prefetch_related(
             'tags', 'images', 'itineraries', 'age_pricing'
@@ -217,7 +213,6 @@ class TourDetailAPIView(RetrieveAPIView):
 
         try:
             instance = self.get_queryset().get(**{self.lookup_field: lookup_value})
-            # Increment view_count atomically
             Tour.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
             instance.refresh_from_db()
         except Tour.DoesNotExist:
@@ -600,9 +595,103 @@ class ToursByDestinationAPIView(APIView):
             }
         )
 
+# class UpdateTourLocationView(APIView):
+#     @swagger_auto_schema(
+#         operation_description="Update latitude and longitude for one or more tour itinerary days.",
+#         tags=["Public APIs"],
+#         request_body=openapi.Schema(
+#             type=openapi.TYPE_OBJECT,
+#             required=['tour_uuid', 'days'],
+#             properties={
+#                 "tour_uuid": openapi.Schema(
+#                     type=openapi.TYPE_STRING,
+#                     format="uuid",
+#                     description="UUID of the tour"
+#                 ),
+#                 "days": openapi.Schema(
+#                     type=openapi.TYPE_OBJECT,
+#                     description="Dictionary of day numbers mapped to coordinates",
+#                     example={
+#                         "1": {"latitude": 41.311081, "longitude": 69.240562},
+#                         "2": {"latitude": 41.312345, "longitude": 69.241234}
+#                     },
+#                     additional_properties=openapi.Schema(
+#                         type=openapi.TYPE_OBJECT,
+#                         properties={
+#                             "latitude": openapi.Schema(
+#                                 type=openapi.TYPE_NUMBER,
+#                                 format="float",
+#                                 description="Latitude for the given day"
+#                             ),
+#                             "longitude": openapi.Schema(
+#                                 type=openapi.TYPE_NUMBER,
+#                                 format="float",
+#                                 description="Longitude for the given day"
+#                             ),
+#                         },
+#                         required=["latitude", "longitude"]
+#                     )
+#                 )
+#             }
+#         ),
+#         responses={
+#             200: openapi.Response(
+#                 description="Itineraries updated successfully",
+#                 examples={
+#                     "application/json": {
+#                         "status": 200,
+#                         "message": "Itineraries updated successfully for days: [1]"
+#                     }
+#                 }
+#             ),
+#             404: openapi.Response(
+#                 description="Tour or Itinerary not found",
+#                 examples={
+#                     "application/json": {
+#                         "status": 404,
+#                         "message": "Tour not found or itinerary day 2 does not exist"
+#                     }
+#                 }
+#             ),
+#             400: openapi.Response(
+#                 description="Validation error",
+#                 examples={
+#                     "application/json": {
+#                         "status": 400,
+#                         "message": "Validation failed",
+#                         "data": {"days": "This field is required."}
+#                     }
+#                 }
+#             )
+#         }
+#     )
+#     def post(self, request):
+#         serializer = UpdateTourLocationSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+
+#         tour_uuid = serializer.validated_data['tour_uuid']
+#         days = serializer.validated_data['days']
+
+#         tour = get_object_or_404(Tour, uuid=tour_uuid)
+
+#         updated_days = []
+#         for day_number_str, coords in days.items():
+#             day_number = int(day_number_str)
+#             itinerary = get_object_or_404(Itinerary, tour=tour, day_number=day_number)
+#             itinerary.latitude = coords.get('latitude')
+#             itinerary.longitude = coords.get('longitude')
+#             itinerary.save()
+#             updated_days.append(day_number)
+
+#         return custom_response(
+#             statusCode=status.HTTP_200_OK,
+#             message="Itineraries updated successfully for days",
+           
+#         )
+
 class UpdateTourLocationView(APIView):
     @swagger_auto_schema(
-        operation_description="Update latitude and longitude for one or more tour itinerary days.",
+        operation_description="Insert or update latitude and longitude for one or more tour itinerary days.",
         tags=["Public APIs"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
@@ -623,52 +712,14 @@ class UpdateTourLocationView(APIView):
                     additional_properties=openapi.Schema(
                         type=openapi.TYPE_OBJECT,
                         properties={
-                            "latitude": openapi.Schema(
-                                type=openapi.TYPE_NUMBER,
-                                format="float",
-                                description="Latitude for the given day"
-                            ),
-                            "longitude": openapi.Schema(
-                                type=openapi.TYPE_NUMBER,
-                                format="float",
-                                description="Longitude for the given day"
-                            ),
+                            "latitude": openapi.Schema(type=openapi.TYPE_NUMBER, format="float"),
+                            "longitude": openapi.Schema(type=openapi.TYPE_NUMBER, format="float"),
                         },
                         required=["latitude", "longitude"]
                     )
                 )
             }
         ),
-        responses={
-            200: openapi.Response(
-                description="Itineraries updated successfully",
-                examples={
-                    "application/json": {
-                        "status": 200,
-                        "message": "Itineraries updated successfully for days: [1]"
-                    }
-                }
-            ),
-            404: openapi.Response(
-                description="Tour or Itinerary not found",
-                examples={
-                    "application/json": {
-                        "status": 404,
-                        "message": "Tour not found or itinerary day 2 does not exist"
-                    }
-                }
-            ),
-            400: openapi.Response(
-                description="Validation error",
-                examples={
-                    "application/json": {
-                        "status": 400,
-                        "message": "Validation failed",
-                        "data": {"days": "This field is required."}
-                    }
-                }
-            )
-        }
     )
     def post(self, request):
         serializer = UpdateTourLocationSerializer(data=request.data)
@@ -679,18 +730,43 @@ class UpdateTourLocationView(APIView):
 
         tour = get_object_or_404(Tour, uuid=tour_uuid)
 
-        updated_days = []
+        inserted_days, updated_days = [], []
+
         for day_number_str, coords in days.items():
             day_number = int(day_number_str)
             itinerary = get_object_or_404(Itinerary, tour=tour, day_number=day_number)
-            itinerary.latitude = coords.get('latitude')
-            itinerary.longitude = coords.get('longitude')
+
+            if itinerary.latitude is None or itinerary.longitude is None:
+                # Insert (first time setting coords)
+                itinerary.latitude = coords.get('latitude')
+                itinerary.longitude = coords.get('longitude')
+                inserted_days.append(day_number)
+            else:
+                # Always update if already has coords
+                itinerary.latitude = coords.get('latitude')
+                itinerary.longitude = coords.get('longitude')
+                updated_days.append(day_number)
+
             itinerary.save()
-            updated_days.append(day_number)
 
-        return custom_response(
-            statusCode=status.HTTP_200_OK,
-            message="Itineraries updated successfully for days",
-           
-        )
-
+        # Decide response
+        if inserted_days and updated_days:
+            return custom_response(
+                statusCode=status.HTTP_200_OK,
+                message=f"Inserted coords for days {inserted_days}, updated coords for days {updated_days}"
+            )
+        elif inserted_days:
+            return custom_response(
+                statusCode=status.HTTP_200_OK,
+                message=f"Inserted coords successfully for days {inserted_days}"
+            )
+        elif updated_days:
+            return custom_response(
+                statusCode=status.HTTP_201_CREATED,
+                message=f"Updated coords successfully for days {updated_days}"
+            )
+        else:
+            return custom_response(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="No changes were made."
+            )
