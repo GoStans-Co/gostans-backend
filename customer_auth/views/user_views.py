@@ -220,9 +220,9 @@ class CustomerUserProfileView(APIView):
 
         profile_data = CustomerUserProfileSerializer(user).data
         profile_data["bookings"] = {
-            "all": TourBookingSerializer(all_bookings, many=True).data,
-            "upcoming": TourBookingSerializer(upcoming_bookings, many=True).data,
-            "completed": TourBookingSerializer(completed_bookings, many=True).data
+            "all": TourBookingSerializer(all_bookings, many=True,context={"request": request}).data,
+            "upcoming": TourBookingSerializer(upcoming_bookings, many=True,context={"request": request}).data,
+            "completed": TourBookingSerializer(completed_bookings, many=True,context={"request": request}).data
         }
         return custom_response(
             statusCode=status.HTTP_200_OK,

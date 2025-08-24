@@ -100,6 +100,7 @@ class TourBookingSerializer(serializers.ModelSerializer):
     uuid = serializers.UUIDField(source='tour.uuid', read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
     participants = BookingParticipantSerializer(many=True)
+    main_image = serializers.SerializerMethodField()
 
     class Meta:
         model = TourBooking
@@ -118,7 +119,12 @@ class TourBookingSerializer(serializers.ModelSerializer):
             'payments',
             'participants'
         ]
-
+    
+    def get_main_image(self, obj):
+        request = self.context.get('request')
+        if obj.tour and obj.tour.main_image:
+            return request.build_absolute_uri(obj.tour.main_image.url)
+        return None
 
 class CardholderInfoSerializer(serializers.ModelSerializer):
     class Meta:

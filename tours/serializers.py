@@ -31,13 +31,32 @@ class TourImageSerializer(serializers.ModelSerializer):
         model = TourImage
         fields = ['id', 'image']
 
+class LocationSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, allow_null=True)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, allow_null=True)
+
+
 class ItinerarySerializer(serializers.ModelSerializer):
+    locationNames = serializers.SerializerMethodField()
+
     class Meta:
         model = Itinerary
         fields = [
             'day_number', 'day_title', 'description', 'accommodation', 
-            'included_meals', 'location_name', 'latitude', 'longitude'
+            'included_meals', 'locationNames'
         ]
+    def get_locationNames(self, obj):
+        locations = []
+        if obj.location_name:
+            # Split by comma in case multiple locations are provided: "Samarkand, Bukhara"
+            for loc in [name.strip() for name in obj.location_name.split(",") if name.strip()]:
+                locations.append({
+                    "name": loc,
+                    "latitude": obj.latitude,
+                    "longitude": obj.longitude,
+                })
+        return locations
 
 
 class TourPricingSerializer(serializers.ModelSerializer):
