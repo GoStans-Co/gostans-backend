@@ -1008,9 +1008,4 @@ class OAuthExchangeAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-#         https://accounts.google.com/o/oauth2/v2/auth?
-# client_id=952651293760-udu8kntqm3u21a5ubmbtk5r61r60avol.apps.googleusercontent.com&
-# redirect_uri=http://localhost:5173/oauth2/redirect&
-# response_type=code&
-# scope=openid%20email%20profile&
-# access_type=offline
+       

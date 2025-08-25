@@ -16,6 +16,10 @@ def generate_uuid25():
     return Uuid25.from_uuid(standard_uuid).value
 
 class CustomerUser(models.Model):
+    class Meta:
+        verbose_name = "All List"          # shows in admin forms, detail
+        verbose_name_plural = " All List"
+
     id = models.CharField(primary_key=True, default=generate_uuid25, editable=False, max_length=25)
     email = models.EmailField(unique=True,verbose_name=_("Email"))
     name = models.CharField(max_length=255,verbose_name=_("Name"))
