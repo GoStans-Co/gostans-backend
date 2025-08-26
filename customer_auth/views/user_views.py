@@ -944,10 +944,10 @@ class OrderDetailView(APIView):
             customer=request.user
         )
 
-        serializer = TourBookingSerializer(booking)
+        serializer = TourBookingSerializer(booking,context={'request': request}).data
         return custom_response(
             statusCode=status.HTTP_200_OK,
-            data=serializer.data,
+            data=serializer,
             message="Order detail fetched successfully"
         )
 
