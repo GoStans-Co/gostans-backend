@@ -76,7 +76,7 @@ urlpatterns = [
     path('api/v1/tours/',include('tours.urls')),
     path('api/v1/auth/',include('customer_auth.urls.social_urls')),
     path('api/v1/location/',include('location.urls')),
-
+    path('chaining/', include('smart_selects.urls')),
 
    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

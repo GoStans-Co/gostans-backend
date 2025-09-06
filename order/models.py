@@ -19,6 +19,9 @@ class Cart(models.Model):
 
 
 class TourBooking(models.Model):
+    class Meta:
+        verbose_name = "All List"          # shows in admin forms, detail
+        verbose_name_plural = " All List"
     STATUS_CHOICES = [
         ("Pending", "pending"),
         ("COMPLETED", "Completed"),

@@ -5,7 +5,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from common.utils import custom_response,get_client_ip,calculate_top_destinations
-from .models import Tour,TourAnalytics,TourRating,Wishlist,Destination,Itinerary
+from .models import Tour,TourAnalytics,TourRating,Wishlist,Destination,ItineraryDay, ItinerarySlot
 from .serializers import TourListSerializer,TourDetailSerializer,TourRatingSerializer,CountryCityTourSerializer,TrendingTourSerializer,UpdateTourLocationSerializer
 from rest_framework.generics import RetrieveAPIView
 from customer_auth.models import CustomerUser
@@ -166,7 +166,7 @@ class TourDetailAPIView(RetrieveAPIView):
 
     def get_queryset(self):
         base_queryset = Tour.objects.all().prefetch_related(
-            'tags', 'images', 'itineraries', 'age_pricing'
+            'tags', 'images', 'itinerary_days', 'age_pricing'
         ).select_related('country', 'city', 'tour_type')
 
         user = self.request.user

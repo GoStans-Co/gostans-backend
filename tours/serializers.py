@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Tour, TourTag, TourType,TourImage,Itinerary,TourPricing,Wishlist,ExcludedItem,IncludedItem,TourRating,Destination
+from .models import Tour, TourTag, TourType,TourImage,ItineraryDay, ItinerarySlot,TourPricing,Wishlist,ExcludedItem,IncludedItem,TourRating,Destination
 from location.models import Country,City
 
 class TourTagSerializer(serializers.ModelSerializer):
@@ -36,27 +36,50 @@ class LocationSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6, allow_null=True)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6, allow_null=True)
 
-
-class ItinerarySerializer(serializers.ModelSerializer):
+class ItinerarySlotSerializer(serializers.ModelSerializer):
     locationNames = serializers.SerializerMethodField()
 
     class Meta:
-        model = Itinerary
-        fields = [
-            'day_number', 'day_title', 'description', 'accommodation', 
-            'included_meals', 'locationNames'
-        ]
+        model = ItinerarySlot
+        fields = ['start_time', 'end_time', 'title', 'description', 'locationNames']
+
     def get_locationNames(self, obj):
-        locations = []
         if obj.location_name:
-            # Split by comma in case multiple locations are provided: "Samarkand, Bukhara"
-            for loc in [name.strip() for name in obj.location_name.split(",") if name.strip()]:
-                locations.append({
-                    "name": loc,
-                    "latitude": obj.latitude,
-                    "longitude": obj.longitude,
-                })
-        return locations
+            return [{
+                "name": obj.location_name,
+                "latitude": obj.latitude,
+                "longitude": obj.longitude
+            }]
+        return []
+
+class ItineraryDaySerializer(serializers.ModelSerializer):
+    slots = ItinerarySlotSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ItineraryDay
+        fields = ['day_number', 'day_title', 'description', 'slots']
+
+
+# class ItinerarySerializer(serializers.ModelSerializer):
+#     locationNames = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Itinerary
+#         fields = [
+#             'day_number', 'day_title', 'description', 'accommodation', 
+#             'included_meals', 'locationNames'
+#         ]
+#     def get_locationNames(self, obj):
+#         locations = []
+#         if obj.location_name:
+#             # Split by comma in case multiple locations are provided: "Samarkand, Bukhara"
+#             for loc in [name.strip() for name in obj.location_name.split(",") if name.strip()]:
+#                 locations.append({
+#                     "name": loc,
+#                     "latitude": obj.latitude,
+#                     "longitude": obj.longitude,
+#                 })
+#         return locations
 
 
 class TourPricingSerializer(serializers.ModelSerializer):
@@ -70,14 +93,25 @@ class ExcludedItemSerializer(serializers.ModelSerializer):
         model = ExcludedItem
         fields = ['text']
 
+    def to_representation(self, instance):
+        # Split comma-separated text into multiple items
+        items = [t.strip() for t in instance.text.split(',') if t.strip()]
+        return [{'text': t} for t in items]
+
 class IncludedItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = IncludedItem
         fields = ['text']
 
+    def to_representation(self, instance):
+        # Split comma-separated text into multiple items
+        items = [t.strip() for t in instance.text.split(',') if t.strip()]
+        return [{'text': t} for t in items]
+
 class TourDetailSerializer(serializers.ModelSerializer):
     images = TourImageSerializer(many=True, read_only=True)
-    itineraries = ItinerarySerializer(many=True, read_only=True)
+    # itineraries = ItinerarySerializer(many=True, read_only=True)
+    itineraries = ItineraryDaySerializer(many=True, read_only=True, source='itinerary_days')
     agepricing = TourPricingSerializer(many=True, read_only=True)
     tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='slug')
     excludedItem = ExcludedItemSerializer(source='excluded_items',many=True, read_only=True)
@@ -86,6 +120,7 @@ class TourDetailSerializer(serializers.ModelSerializer):
     country = serializers.StringRelatedField()
     city = serializers.StringRelatedField()
     is_liked = serializers.SerializerMethodField()
+    duration = serializers.ReadOnlyField(source='duration_display')
 
     class Meta:
         model = Tour
@@ -155,7 +190,6 @@ class DestinationSerializer(serializers.ModelSerializer):
 
     def get_tour_count(self, obj):
         return getattr(obj, 'tour_count', 0)
-
 
 
 class CountryCityTourSerializer(serializers.ModelSerializer):

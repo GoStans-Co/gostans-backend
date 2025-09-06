@@ -71,14 +71,18 @@ class Tour(models.Model):
         ('uz', 'Uzbek'),
         ('ko', 'Korean'),
     ]
-    
-    DURATION_CHOICES = [(f'{i} day', f'{i} Day{"s" if i > 1 else ""}') for i in range(1, 8)]
+        
     title = models.CharField(max_length=255)
     short_description = models.TextField(max_length=300)
     tour_type = models.ForeignKey(TourType, on_delete=models.SET_NULL, null=True)
     # duration = models.CharField(max_length=10, choices=DURATION_CHOICES)
-    duration = models.PositiveIntegerField(help_text="Enter number of days for the tour")
-
+    # duration = models.PositiveIntegerField(help_text="Enter number of days for the tour")
+    duration_days = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Enter number of days for the tour"
+    )
+    duration_hours = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Additional hours for short tours or half-day tours"
+    )
     about = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(
@@ -152,12 +156,13 @@ class Tour(models.Model):
 
     @property
     def duration_display(self):
-        try:
-            # duration is now an integer
-            days = int(self.duration)
-        except (ValueError, TypeError):
-            days = 1
-        return f"{days} Day{'s' if days > 1 else ''}"
+        parts = []
+        if self.duration_days:
+            parts.append(f"{self.duration_days} Day{'s' if self.duration_days > 1 else ''}")
+        if self.duration_hours:
+            parts.append(f"{self.duration_hours} Hour{'s' if self.duration_hours > 1 else ''}")
+        return " + ".join(parts) if parts else "N/A"
+
 
 class TourImage(models.Model):
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='images')
@@ -181,32 +186,77 @@ class ExcludedItem(models.Model):
     def __str__(self):
         return f"Excluded: {self.text}"
 
-class Itinerary(models.Model):
-    tour = models.ForeignKey(Tour, related_name='itineraries', on_delete=models.CASCADE)
+# class Itinerary(models.Model):
+#     tour = models.ForeignKey(Tour, related_name='itineraries', on_delete=models.CASCADE)
+#     day_number = models.PositiveIntegerField()
+#     day_title = models.CharField(max_length=200, blank=True)
+#     description = models.TextField()
+#     accommodation = models.CharField(max_length=255, blank=True)
+#     included_meals = models.CharField(max_length=255, blank=True)
+#     location_name = models.CharField(max_length=255,blank=True, null=True) 
+#     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+#     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+
+#     class Meta:
+#         unique_together = ('tour', 'day_number')
+#         ordering = ['day_number']
+
+#     def __str__(self):
+#         return f"Day {self.day_number} - {self.day_title or 'Itinerary'}"
+
+#     def save(self, *args, **kwargs):
+#         if self.location_name and (not self.latitude or not self.longitude):
+#             lat, lng = get_coordinates(self.location_name)
+#             if lat and lng:
+#                 self.latitude = lat
+#                 self.longitude = lng
+#         super().save(*args, **kwargs)
+
+
+class ItineraryDay(models.Model):
+    tour = models.ForeignKey(
+        Tour, related_name="itinerary_days", on_delete=models.CASCADE
+    )
     day_number = models.PositiveIntegerField()
     day_title = models.CharField(max_length=200, blank=True)
-    description = models.TextField()
-    accommodation = models.CharField(max_length=255, blank=True)
-    included_meals = models.CharField(max_length=255, blank=True)
-    location_name = models.CharField(max_length=255,blank=True, null=True) 
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-
-
+    description = models.TextField(blank=True)
+    accommodation = models.CharField(
+        max_length=255, blank=True, null=True, help_text="E.g. Hotel name or place of stay"
+    )
+    included_meals = models.CharField(
+        blank=True, null=True, help_text="E.g. Breakfast, Lunch, Dinner"
+    )
     class Meta:
-        unique_together = ('tour', 'day_number')
-        ordering = ['day_number']
+        unique_together = ("tour", "day_number")
+        ordering = ["day_number"]
 
     def __str__(self):
         return f"Day {self.day_number} - {self.day_title or 'Itinerary'}"
 
-    def save(self, *args, **kwargs):
-        if self.location_name and (not self.latitude or not self.longitude):
-            lat, lng = get_coordinates(self.location_name)
-            if lat and lng:
-                self.latitude = lat
-                self.longitude = lng
-        super().save(*args, **kwargs)
+
+class ItinerarySlot(models.Model):
+    day = models.ForeignKey(
+        ItineraryDay, related_name="slots", on_delete=models.CASCADE
+    )
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+
+    title = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    included_meals = models.CharField(
+        blank=True, null=True, help_text="E.g. Breakfast, Lunch, Dinner"
+    )
+    location_name = models.CharField(max_length=255, blank=True, null=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    class Meta:
+        ordering = ["start_time"]
+
+    def __str__(self):
+        return f"{self.title or 'Activity'} ({self.start_time} - {self.end_time})"
+
 
 class Wishlist(models.Model):
     customer = models.ForeignKey('customer_auth.CustomerUser', on_delete=models.CASCADE, related_name='wishlists')

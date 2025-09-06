@@ -1,0 +1,14 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block after_related_objects %}
+  {{ block.super }}
+
+  <h2>Upload Multiple Images</h2>
+  <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ upload_form.media }}
+      {{ upload_form.images }}
+      <button type="submit" name="upload_images" class="default">Upload</button>
+  </form>
+{% endblock %}
