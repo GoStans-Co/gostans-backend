@@ -179,7 +179,7 @@ class ItinerarySlotInline(nested_admin.NestedStackedInline):
     model = ItinerarySlot
     extra = 1
     form = ItinerarySlotForm 
-    fields = (('start_time', 'end_time'), 'title', 'description','included_meals')
+    fields = (('start_time', 'end_time'), 'title', 'description','included_meals','location_name')
     readonly_fields = ('latitude', 'longitude')
     ordering = ('start_time',)
 
