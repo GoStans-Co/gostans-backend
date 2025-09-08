@@ -96,19 +96,83 @@ class TourImageInline(nested_admin.NestedTabularInline):
         return ""
     image_preview.short_description = 'Preview'
 
+# class includedItemInlineForm(forms.ModelForm):
+#     # text = forms.CharField(
+#     #     widget=forms.TextInput(attrs={
+#     #         'style': 'width: 400px;',
+#     #         'placeholder': 'Add multiple items separated by commas',
+#     #         'data-role': 'tagsinput',  # for JS tag library
+#     #     }),
+#     #     required=False
+#     # )
+#     included_text = forms.CharField(   # ← you need this instead of redefining `text`
+#         widget=forms.TextInput(attrs={
+#             'style': 'width: 400px;',
+#             'placeholder': 'Add multiple items separated by commas',
+#             'data-role': 'tagsinput',
+#         }),
+#         required=False
+#     )
+
+#     class Meta:
+#         model = IncludedItem
+#         fields = '__all__'
+
+#     # def __init__(self, *args, **kwargs):
+#     #     super().__init__(*args, **kwargs)
+#     #     if self.instance.pk:
+#     #         # Prepopulate the field with existing included items
+#     #         self.fields['included_text'].initial = ", ".join(
+#     #             item.text for item in self.instance.included_items.all()
+#     #         )
+
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         # IMPORTANT: only try to use included_items if this is a Tour
+#         if self.instance and hasattr(self.instance, "tour") and self.instance.tour_id:
+#             self.fields['included_text'].initial = ", ".join(
+#                 item.text for item in self.instance.tour.included_items.all()
+#             )
+
+#     def save(self, commit=True):
+#         included_item = super().save(commit=False)
+#         tour = included_item.tour
+
+#         if commit:
+#             included_item.save()
+
+#             if 'included_text' in self.cleaned_data:
+#                 text_values = self.cleaned_data['included_text'].split(',')
+#                 # Clear old items
+#                 tour.included_items.all().delete()
+#                 # Create new ones
+#                 for t in text_values:
+#                     t = t.strip()
+#                     if t:
+#                         IncludedItem.objects.create(tour=tour, text=t)
+#         return included_item
+
+
+# class IncludedItemInline(nested_admin.NestedTabularInline):
+#     model = IncludedItem
+#     extra = 1
+#     fields = ['text']
+#     can_delete = False 
+#     verbose_name = "Included Item"
+#     verbose_name_plural = "Included Items"
+#     form = includedItemInlineForm
+
+#     class Media:
+#         css = {
+#             'all': ('css/hide_inline_add.css',) 
+#         }
+
+
 class includedItemInlineForm(forms.ModelForm):
-    # text = forms.CharField(
-    #     widget=forms.TextInput(attrs={
-    #         'style': 'width: 400px;',
-    #         'placeholder': 'Add multiple items separated by commas',
-    #         'data-role': 'tagsinput',  # for JS tag library
-    #     }),
-    #     required=False
-    # )
-    included_text = forms.CharField(   # ← you need this instead of redefining `text`
+    text = forms.CharField(
         widget=forms.TextInput(attrs={
             'style': 'width: 400px;',
-            'placeholder': 'Add multiple items separated by commas',
+            'placeholder': 'Add items (comma-separated allowed)',
             'data-role': 'tagsinput',
         }),
         required=False
@@ -116,56 +180,24 @@ class includedItemInlineForm(forms.ModelForm):
 
     class Meta:
         model = IncludedItem
-        fields = '__all__'
+        fields = ['text']
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     if self.instance.pk:
-    #         # Prepopulate the field with existing included items
-    #         self.fields['included_text'].initial = ", ".join(
-    #             item.text for item in self.instance.included_items.all()
-    #         )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # IMPORTANT: only try to use included_items if this is a Tour
-        if self.instance and hasattr(self.instance, "tour") and self.instance.tour_id:
-            self.fields['included_text'].initial = ", ".join(
-                item.text for item in self.instance.tour.included_items.all()
-            )
-
-    def save(self, commit=True):
-        included_item = super().save(commit=False)
-        tour = included_item.tour
-
-        if commit:
-            included_item.save()
-
-            if 'included_text' in self.cleaned_data:
-                text_values = self.cleaned_data['included_text'].split(',')
-                # Clear old items
-                tour.included_items.all().delete()
-                # Create new ones
-                for t in text_values:
-                    t = t.strip()
-                    if t:
-                        IncludedItem.objects.create(tour=tour, text=t)
-        return included_item
-
+    def clean_text(self):
+        text = self.cleaned_data['text']
+        # store only the raw text in this row
+        return text
 
 class IncludedItemInline(nested_admin.NestedTabularInline):
     model = IncludedItem
-    extra = 1
+    form = includedItemInlineForm
+    extra = 0
     fields = ['text']
-    can_delete = False 
+    can_delete = False
     verbose_name = "Included Item"
     verbose_name_plural = "Included Items"
-    form = includedItemInlineForm
 
-    class Media:
-        css = {
-            'all': ('css/hide_inline_add.css',) 
-        }
+
+
 
 class ExcludedItemInlineForm(forms.ModelForm):
     text = forms.CharField(
@@ -190,7 +222,7 @@ class ExcludedItemInlineForm(forms.ModelForm):
 
 class ExcludedItemInline(nested_admin.NestedTabularInline):
     model = ExcludedItem
-    extra = 1
+    extra = 0
     fields = ['text']
     can_delete = False 
     verbose_name = "Excluded Item"
@@ -199,7 +231,7 @@ class ExcludedItemInline(nested_admin.NestedTabularInline):
 
 class ItinerarySlotInline(nested_admin.NestedStackedInline):
     model = ItinerarySlot
-    extra = 1
+    extra = 0
     form = ItinerarySlotForm 
     fields = (('start_time', 'end_time'), 'title', 'description','included_meals','location_name')
     readonly_fields = ('latitude', 'longitude')
@@ -208,7 +240,7 @@ class ItinerarySlotInline(nested_admin.NestedStackedInline):
 class ItineraryDayInline(nested_admin.NestedStackedInline):
     model = ItineraryDay
     form = ItineraryDayForm 
-    extra = 1
+    extra = 0
     fields = ('day_number', 'day_title', 'description','accommodation','included_meals')
     inlines = [ItinerarySlotInline]  # nested slots inside day
 
