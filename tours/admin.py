@@ -97,11 +97,19 @@ class TourImageInline(nested_admin.NestedTabularInline):
     image_preview.short_description = 'Preview'
 
 class includedItemInlineForm(forms.ModelForm):
-    text = forms.CharField(
+    # text = forms.CharField(
+    #     widget=forms.TextInput(attrs={
+    #         'style': 'width: 400px;',
+    #         'placeholder': 'Add multiple items separated by commas',
+    #         'data-role': 'tagsinput',  # for JS tag library
+    #     }),
+    #     required=False
+    # )
+    included_text = forms.CharField(   # ← you need this instead of redefining `text`
         widget=forms.TextInput(attrs={
             'style': 'width: 400px;',
             'placeholder': 'Add multiple items separated by commas',
-            'data-role': 'tagsinput',  # for JS tag library
+            'data-role': 'tagsinput',
         }),
         required=False
     )
@@ -110,25 +118,39 @@ class includedItemInlineForm(forms.ModelForm):
         model = IncludedItem
         fields = '__all__'
 
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     if self.instance.pk:
+    #         # Prepopulate the field with existing included items
+    #         self.fields['included_text'].initial = ", ".join(
+    #             item.text for item in self.instance.included_items.all()
+    #         )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance.pk:
-            # Prepopulate the field with existing included items
+        # IMPORTANT: only try to use included_items if this is a Tour
+        if self.instance and hasattr(self.instance, "tour") and self.instance.tour_id:
             self.fields['included_text'].initial = ", ".join(
-                item.text for item in self.instance.included_items.all()
+                item.text for item in self.instance.tour.included_items.all()
             )
 
     def save(self, commit=True):
-        tour = super().save(commit)
-        text_values = self.cleaned_data['included_text'].split(',')
-        # Clear old items
-        tour.included_items.all().delete()
-        # Create new items
-        for t in text_values:
-            t = t.strip()
-            if t:
-                IncludedItem.objects.create(tour=tour, text=t)
-        return tour
+        included_item = super().save(commit=False)
+        tour = included_item.tour
+
+        if commit:
+            included_item.save()
+
+            if 'included_text' in self.cleaned_data:
+                text_values = self.cleaned_data['included_text'].split(',')
+                # Clear old items
+                tour.included_items.all().delete()
+                # Create new ones
+                for t in text_values:
+                    t = t.strip()
+                    if t:
+                        IncludedItem.objects.create(tour=tour, text=t)
+        return included_item
 
 
 class IncludedItemInline(nested_admin.NestedTabularInline):
