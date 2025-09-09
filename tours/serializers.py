@@ -54,10 +54,24 @@ class ItinerarySlotSerializer(serializers.ModelSerializer):
 
 class ItineraryDaySerializer(serializers.ModelSerializer):
     slots = ItinerarySlotSerializer(many=True, read_only=True)
+    locationNames = serializers.SerializerMethodField()
 
     class Meta:
         model = ItineraryDay
-        fields = ['day_number', 'day_title', 'description', 'slots']
+        fields = ['day_number', 'day_title', 'description', 'locationNames', 'slots']
+
+    def get_locationNames(self, obj):
+        locations = []
+        if obj.location_name:
+            # Split by comma in case multiple locations are provided: "Samarkand, Bukhara"
+            for loc in [name.strip() for name in obj.location_name.split(",") if name.strip()]:
+                locations.append({
+                    "name": loc,
+                    "latitude": obj.latitude,
+                    "longitude": obj.longitude,
+                })
+        return locations
+
 
 
 # class ItinerarySerializer(serializers.ModelSerializer):

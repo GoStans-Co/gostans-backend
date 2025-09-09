@@ -186,33 +186,6 @@ class ExcludedItem(models.Model):
     def __str__(self):
         return f"Excluded: {self.text}"
 
-# class Itinerary(models.Model):
-#     tour = models.ForeignKey(Tour, related_name='itineraries', on_delete=models.CASCADE)
-#     day_number = models.PositiveIntegerField()
-#     day_title = models.CharField(max_length=200, blank=True)
-#     description = models.TextField()
-#     accommodation = models.CharField(max_length=255, blank=True)
-#     included_meals = models.CharField(max_length=255, blank=True)
-#     location_name = models.CharField(max_length=255,blank=True, null=True) 
-#     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-#     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-
-
-#     class Meta:
-#         unique_together = ('tour', 'day_number')
-#         ordering = ['day_number']
-
-#     def __str__(self):
-#         return f"Day {self.day_number} - {self.day_title or 'Itinerary'}"
-
-#     def save(self, *args, **kwargs):
-#         if self.location_name and (not self.latitude or not self.longitude):
-#             lat, lng = get_coordinates(self.location_name)
-#             if lat and lng:
-#                 self.latitude = lat
-#                 self.longitude = lng
-#         super().save(*args, **kwargs)
-
 
 class ItineraryDay(models.Model):
     tour = models.ForeignKey(
@@ -227,6 +200,10 @@ class ItineraryDay(models.Model):
     included_meals = models.CharField(
         blank=True, null=True, help_text="E.g. Breakfast, Lunch, Dinner"
     )
+    location_name = models.CharField(max_length=255, blank=True, null=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
     class Meta:
         unique_together = ("tour", "day_number")
         ordering = ["day_number"]
